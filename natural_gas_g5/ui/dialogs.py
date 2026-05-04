@@ -112,10 +112,10 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.0 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.1 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.0 sürümü ile görselleştirme ve raporlama özellikleri eklenmiştir.\n\n"
+        "v1.1 sürümü ile hesaplama güvenilirliği ve fallback davranışı iyileştirilmiştir.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -152,10 +152,10 @@ def show_user_guide_dialog() -> None:
 
 
 def show_new_features_info() -> None:
-    """Show new features information for v1.0 with do not show again option."""
+    """Show new features information for v1.1 with do not show again option."""
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.0")
+    dialog.title("Yenilikler - Sürüm v1.1")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
@@ -176,7 +176,7 @@ def show_new_features_info() -> None:
     
     # Info Text
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (vv1.0):\n"
+        "🌟 YENİ ÖZELLİKLER (v1.1):\n"
         "• 📈 Faz Diyagramı: Karışımlarınız için çiğlenme/kaynama noktası eğrilerini görün.\n"
         "• 📄 Profesyonel PDF Raporu: Hesaplamalarınızı grafikler içeren şık PDF'lere dönüştürün.\n"
         "• 🥧 Bileşen Pasta Grafiği: Gaz kompozisyonunu görsel olarak anlık takip edin.\n"

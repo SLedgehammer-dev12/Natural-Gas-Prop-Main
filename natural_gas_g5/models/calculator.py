@@ -364,7 +364,10 @@ class ThermoCalculator:
                 cricondenbar_p=max(P_array)
             )
         except Exception as e:
-            self.logger.warning(f"Phase envelope failed with {backend}: {e}")
+            self.logger.info(
+                f"Phase envelope unavailable with {backend}; main thermodynamic results are still valid. "
+                f"Reason: {e}"
+            )
             return None
     
     def _calculate_actual_conditions(
@@ -509,7 +512,7 @@ class ThermoCalculator:
                         "CoolProp yerleşik"
                     )
             except Exception as e:
-                self.logger.warning(f"Built-in HHV/LHV failed: {e}")
+                self.logger.info(f"CoolProp built-in HHV/LHV unavailable: {e}")
         
         # Try Stage 2: Component-based CoolProp
         try:
@@ -528,7 +531,7 @@ class ThermoCalculator:
                     "Bileşen bazlı (CoolProp)"
                 )
         except Exception as e:
-            self.logger.warning(f"Component-based HHV/LHV failed: {e}")
+            self.logger.info(f"CoolProp component HHV/LHV unavailable: {e}")
         
         # Try Stage 3: Reference database
         try:
@@ -571,6 +574,8 @@ class ThermoCalculator:
         Calculate heating values using CoolProp built-in method.
         """
         state_std = self._create_state(mixture, T_ref, P_ref, backend)
+        if not hasattr(state_std, "HHVmass") or not hasattr(state_std, "LHVmass"):
+            raise HeatingValueError(message="CoolProp AbstractState has no HHVmass/LHVmass API")
         
         hhv = state_std.HHVmass() / 1e6  # Convert J/kg to MJ/kg
         lhv = state_std.LHVmass() / 1e6
@@ -592,6 +597,7 @@ class ThermoCalculator:
         """
         total_hhv = 0.0
         total_lhv = 0.0
+        missing_api_logged = False
         
         for component in mixture.components:
             try:
@@ -599,6 +605,12 @@ class ThermoCalculator:
                 component_name = GasMixture._format_gas_name_for_coolprop(component.name)
                 state = CP.AbstractState(backend, component_name)
                 state.update(CP.PT_INPUTS, P_ref, T_ref)
+
+                if not hasattr(state, "HHVmass") or not hasattr(state, "LHVmass"):
+                    if not missing_api_logged:
+                        self.logger.info("CoolProp AbstractState has no per-component HHVmass/LHVmass API")
+                        missing_api_logged = True
+                    continue
                 
                 hhv = state.HHVmass() / 1e6  # MJ/kg
                 lhv = state.LHVmass() / 1e6
@@ -639,23 +651,25 @@ class ThermoCalculator:
         Returns:
             Tuple of (HHV, LHV) in MJ/kg
         """
+        weights = self._get_heating_value_mass_weights(mixture)
         total_hhv = 0.0
         total_lhv = 0.0
         components_found = 0
         
         for component in mixture.components:
-            ref_values = get_reference_heating_values(component.name)
+            component_name = GasMixture._format_gas_name_for_coolprop(component.name)
+            ref_values = get_reference_heating_values(component_name)
             
             if ref_values is not None:
                 hhv, lhv = ref_values
-                fraction_decimal = component.to_decimal()
-                total_hhv += fraction_decimal * hhv
-                total_lhv += fraction_decimal * lhv
+                weight = weights.get(component.name, component.to_decimal())
+                total_hhv += weight * hhv
+                total_lhv += weight * lhv
                 components_found += 1
                 
                 self.logger.debug(
                     f"Reference values for {component.name}: "
-                    f"HHV={hhv:.2f}, LHV={lhv:.2f} MJ/kg"
+                    f"HHV={hhv:.2f}, LHV={lhv:.2f} MJ/kg, weight={weight:.6f}"
                 )
             else:
                 self.logger.warning(
@@ -678,6 +692,39 @@ class ThermoCalculator:
         )
         
         return total_hhv, total_lhv
+
+    def _get_heating_value_mass_weights(self, mixture: GasMixture) -> dict:
+        """
+        Return component weights for mass-basis heating value averaging.
+
+        Reference heating values are stored as MJ/kg. Mass fractions can be used
+        directly; molar fractions must be converted to mass fractions first.
+        """
+        if mixture.fraction_type == "mass":
+            return {component.name: component.to_decimal() for component in mixture.components}
+
+        weighted_masses = {}
+        total = 0.0
+
+        for component in mixture.components:
+            component_name = GasMixture._format_gas_name_for_coolprop(component.name)
+            try:
+                molar_mass = CP.PropsSI("M", component_name)
+            except Exception:
+                state = CP.AbstractState("HEOS", component_name)
+                molar_mass = state.molar_mass()
+
+            weighted_mass = component.to_decimal() * molar_mass
+            weighted_masses[component.name] = weighted_mass
+            total += weighted_mass
+
+        if total <= 0:
+            raise HeatingValueError(message="Could not convert molar fractions to mass fractions")
+
+        return {
+            component_name: weighted_mass / total
+            for component_name, weighted_mass in weighted_masses.items()
+        }
     
     def _package_heating_values(
         self,

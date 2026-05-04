@@ -2,7 +2,7 @@
 
 **Modern, modüler termodinamik gaz karışımı hesaplama uygulaması**
 
-![Version](https://img.shields.io/badge/version-v1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10+-green.svg)
 
 ## 🎯 Özellikler
@@ -52,8 +52,8 @@ from natural_gas_g5.models.calculator import ThermoCalculator
 mixture = GasMixture(
     components=[
         GasComponent(name="Methane", fraction=90.0),
-        GasComponent(name="Ethane", fraction=v1.0),
-        GasComponent(name="Nitrogen", fraction=v1.0)
+        GasComponent(name="Ethane", fraction=5.0),
+        GasComponent(name="Nitrogen", fraction=5.0)
     ],
     fraction_type="molar"
 )
@@ -124,6 +124,11 @@ pytest tests/test_calculator.py -v
 ```
 
 ## 📝 Değişiklik Geçmişi
+
+### Sürüm v1.1 (2026-05-04)
+- HHV/LHV referans veri hesabında molar yüzde için kütle ağırlıklandırması düzeltildi
+- HEOS başarısız olduğunda SRK/PR fallback davranışı etkinleştirildi
+- CoolProp HHV/LHV API ve faz diyagramı uyarıları sadeleştirildi
 
 ### Sürüm v1.0 (2025-11-21)
 - 🎉 İlk v1.0 sürümü - Komple modüler refactoring

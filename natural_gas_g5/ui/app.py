@@ -384,24 +384,23 @@ class ThermoApp(ctk.CTk):
             press_pa = inputs["press_pa"]
             vol_m3 = inputs["vol_m3"]
             
-            # Calculate
-            result = self.calculator.calculate_properties(
+            # Calculate with backend fallback. HEOS can fail for some valid
+            # natural-gas-like mixtures when binary interaction data is missing.
+            result, used_backend = self.calculator.calculate_with_fallback(
                 mixture=mixture,
                 temperature_k=temp_k,
                 pressure_pa=press_pa,
-                backend=inputs["backend"],
+                preferred_backend=inputs["backend"],
                 volume_m3=vol_m3,
                 standard_T=inputs.get("standard_T", config.T_STANDARD),
                 standard_P=inputs.get("standard_P", config.P_STANDARD),
                 standard_name=inputs.get("standard_name")
             )
-            
-            # Check if fallback was needed (if calculator supports tracking)
-            # Currently we use primary calculation directly
-            # If we wanted auto fallback for main calc:
-            # result, used = self.calculator.calculate_with_fallback(...)
-            
-            used_backend = inputs["backend"]
+
+            if result is None:
+                raise ThermoCalculationError(
+                    "Hesaplama HEOS, SRK ve PR yÃ¶ntemleriyle tamamlanamadÄ±."
+                )
             
             # Send success to queue
             self.result_queue.put(("success", (result, used_backend, inputs)))

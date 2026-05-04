@@ -108,7 +108,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.0 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.1 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -207,7 +207,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.0",
+        default="v1.1",
         description="Current application version"
     )
     REPO_USER: str = Field(

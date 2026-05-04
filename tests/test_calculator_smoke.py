@@ -50,3 +50,57 @@ def test_calculator_accepts_propane_display_name():
     assert mixture.to_coolprop_string() == "n-Propane"
     assert result.actual.density > 0
     assert result.heating is not None
+
+
+def test_reference_heating_values_convert_molar_to_mass_weighting():
+    mixture = GasMixture(
+        components=[
+            GasComponent(name="Methane", fraction=50.0),
+            GasComponent(name="Propane", fraction=50.0),
+        ],
+        fraction_type="molar",
+    )
+
+    hhv, lhv = ThermoCalculator()._calculate_heating_values_reference(mixture)
+
+    methane_molar_mass = 0.0160428
+    propane_molar_mass = 0.0440956
+    methane_mass_weight = methane_molar_mass / (methane_molar_mass + propane_molar_mass)
+    propane_mass_weight = propane_molar_mass / (methane_molar_mass + propane_molar_mass)
+
+    expected_hhv = methane_mass_weight * 55.50 + propane_mass_weight * 50.36
+    expected_lhv = methane_mass_weight * 50.01 + propane_mass_weight * 46.37
+
+    assert hhv == pytest.approx(expected_hhv, rel=1e-3)
+    assert lhv == pytest.approx(expected_lhv, rel=1e-3)
+
+
+def test_reference_heating_values_use_mass_fractions_directly():
+    mixture = GasMixture(
+        components=[
+            GasComponent(name="Methane", fraction=50.0),
+            GasComponent(name="Propane", fraction=50.0),
+        ],
+        fraction_type="mass",
+    )
+
+    hhv, lhv = ThermoCalculator()._calculate_heating_values_reference(mixture)
+
+    assert hhv == pytest.approx((55.50 + 50.36) / 2)
+    assert lhv == pytest.approx((50.01 + 46.37) / 2)
+
+
+def test_coolprop_missing_hhv_api_does_not_emit_warning(caplog):
+    mixture = GasMixture(components=[GasComponent(name="Propane", fraction=100.0)])
+
+    result = ThermoCalculator().calculate_properties(
+        mixture=mixture,
+        temperature_k=288.15,
+        pressure_pa=101325.0,
+        backend="HEOS",
+    )
+
+    warning_messages = [record.getMessage() for record in caplog.records if record.levelname == "WARNING"]
+
+    assert result.heating is not None
+    assert not any("HHVmass" in message or "LHVmass" in message for message in warning_messages)
