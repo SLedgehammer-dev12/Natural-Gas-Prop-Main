@@ -1,7 +1,7 @@
 {
-    "product": "Natural Gas Prop Main",
-    "version": "v1.1",
-    "date": "2026-05-04",
-    "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.1",
-    "changelog": "Versiyon v1.1:\n- HHV/LHV referans veri hesaplamasında molar yüzde için kütle ağırlıklandırması düzeltildi\n- CoolProp HHV/LHV API uyarıları azaltıldı\n- HEOS başarısız olduğunda SRK/PR fallback etkinleştirildi\n- Faz diyagramı uyarıları ana hesapları bozmayacak şekilde düzenlendi"
+  "product": "Natural Gas Prop Main",
+  "version": "v1.3",
+  "date": "2026-05-09",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.3",
+  "changelog": "- GERG-2008 ve AGA8-Detail (pyaga8) hesaplama motorlari entegre edildi.\n- Daha genis kapsamli Z-Faktoru ve hesaplama yontemi karsilastirma tablolari eklendi.\n- Desteklenmeyen karisimlarda CoolProp HEOS/SRK ya otomatik akilli gecis saglandi."
 }

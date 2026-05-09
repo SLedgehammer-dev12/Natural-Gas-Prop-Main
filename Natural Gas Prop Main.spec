@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 
 import pathlib
 import customtkinter
@@ -9,7 +9,7 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/'), ('natural_gas_g5', 'natural_gas_g5/')],
+    datas=[(str(customtkinter_path), 'customtkinter/'), ('natural_gas_main', 'natural_gas_main/')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

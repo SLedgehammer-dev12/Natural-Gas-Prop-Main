@@ -1,4 +1,4 @@
-"""
+﻿"""
 Thermodynamic calculator module.
 
 Provides the core calculation engine using CoolProp, independent of UI.
@@ -6,28 +6,40 @@ Provides the core calculation engine using CoolProp, independent of UI.
 
 from typing import Optional, Tuple, List
 import logging
+import math
 
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.core.exceptions import (
+from natural_gas_main.config.settings import config
+from natural_gas_main.core.exceptions import (
     BackendNotAvailableError,
     StateUpdateError,
     HeatingValueError,
     CalculationConvergenceError
 )
-from natural_gas_g5.models.gas_data import GasMixture
-from natural_gas_g5.models.calculation_result import (
+from natural_gas_main.models.gas_data import GasMixture
+from natural_gas_main.models.calculation_result import (
     CalculationResult,
     ActualConditionResults,
     StandardConditionResults,
     HeatingValues,
     VolumeConversion,
-    PhaseEnvelopeData
+    PhaseEnvelopeData,
+    ZFactorComparison
 )
-from natural_gas_g5.models.heating_value_db import get_reference_heating_values
+from natural_gas_main.models.heating_value_db import get_reference_heating_values
+from natural_gas_main.models.z_factor import StandingKatzZFactor
 
 # Try to import CoolProp
 CP = None
 COOLPROP_AVAILABLE = False
+
+
+try:
+    import pyaga8
+    PYAGA8_AVAILABLE = True
+    logging.info("pyaga8 başarıyla yüklendi")
+except ImportError as e:
+    logging.error(f"pyaga8 içe aktarılamadı: {e}")
+    PYAGA8_AVAILABLE = False
 
 try:
     import CoolProp.CoolProp as CP
@@ -57,6 +69,7 @@ class ThermoCalculator:
             raise BackendNotAvailableError("CoolProp")
         
         self.logger = logging.getLogger(__name__)
+        self.z_factor_estimator = StandingKatzZFactor(CP)
         
     def calculate_properties(
         self,
@@ -163,13 +176,30 @@ class ThermoCalculator:
                     standard_name
                 )
                 used_backend = backend
+                result.z_factor_comparison = self._calculate_z_factor_comparison(
+                    mixture,
+                    temperature_k,
+                    pressure_pa
+                )
                 self.logger.info(f"Successfully calculated with {backend}")
                 break
                 
             except Exception as e:
                 self.logger.warning(f"Backend {backend} failed: {e}")
                 continue
-        
+        if result is None:
+            result = self._calculate_z_only_fallback(
+                mixture,
+                temperature_k,
+                pressure_pa,
+                volume_m3,
+                standard_T,
+                standard_P,
+                standard_name
+            )
+            if result is not None:
+                used_backend = "Standing-Katz ANN10"
+
         return result, used_backend
     
     def _select_backend(self, mixture: GasMixture, requested_backend: str) -> str:
@@ -206,17 +236,216 @@ class ThermoCalculator:
         """
         backends = [preferred]
         
-        # Skip HEOS if incompatible
-        incompatible = mixture.check_heos_compatibility()
-        if incompatible and preferred == "HEOS":
-            backends = ["SRK", "PR"]
-        else:
-            # Add fallbacks
-            for fallback in ["SRK", "PR"]:
-                if fallback not in backends:
-                    backends.append(fallback)
+        # Check compatibility
+        heos_incompatible = mixture.check_heos_compatibility()
+        if heos_incompatible and preferred == "HEOS":
+            backends = []
+            
+        # Add fallbacks in order of preference
+        all_fallbacks = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
+        for fallback in all_fallbacks:
+            if fallback == "HEOS" and heos_incompatible:
+                continue
+            if fallback not in backends:
+                backends.append(fallback)
         
         return backends
+
+    def _calculate_z_factor_comparison(
+        self,
+        mixture: GasMixture,
+        temperature_k: float,
+        pressure_pa: float
+    ) -> List[ZFactorComparison]:
+        """Return comprehensive Z-factor comparisons across all backends."""
+        comparisons = []
+        
+        # 1. Standing-Katz and DAK
+        try:
+            estimates = self.z_factor_estimator.estimates(mixture, temperature_k, pressure_pa)
+            for est in estimates:
+                comparisons.append(ZFactorComparison(
+                    method=est.method,
+                    z_factor=est.z_factor,
+                    ppr=est.ppr,
+                    tpr=est.tpr,
+                    valid=est.valid,
+                    warning=est.warning
+                ))
+        except Exception as e:
+            self.logger.info(f"Standing-Katz/DAK Z comparison unavailable: {e}")
+            
+        # Helper to get pseudo criticals for valid flag
+        try:
+            pseudo = self.z_factor_estimator.pseudo_critical(mixture)
+            ppr = pressure_pa / pseudo.pc_pa
+            tpr = temperature_k / pseudo.tc_k
+        except:
+            ppr, tpr = 1.0, 1.0
+            
+        # 2. Add GERG-2008 & AGA8-Detail
+        for method in ["GERG-2008", "AGA8-Detail"]:
+            try:
+                res = self._calculate_aga8(mixture, temperature_k, pressure_pa, method)
+                comparisons.append(ZFactorComparison(
+                    method=method, 
+                    z_factor=res.compressibility_factor, 
+                    density=res.density,
+                    molar_mass=res.molar_mass,
+                    enthalpy=res.enthalpy,
+                    entropy=res.entropy,
+                    cp=res.cp,
+                    cv=res.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                ))
+            except Exception as e: 
+                pass
+            
+        # 3. Add HEOS, SRK, PR
+        for method in ["HEOS", "SRK", "PR"]:
+            try:
+                if method == "HEOS" and mixture.check_heos_compatibility(): continue
+                state = self._create_state(mixture, temperature_k, pressure_pa, method)
+                res = self._calculate_actual_conditions(state)
+                comparisons.append(ZFactorComparison(
+                    method=method, 
+                    z_factor=res.compressibility_factor, 
+                    density=res.density,
+                    molar_mass=res.molar_mass,
+                    enthalpy=res.enthalpy,
+                    entropy=res.entropy,
+                    cp=res.cp,
+                    cv=res.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                ))
+            except Exception as e: 
+                pass
+            
+        return comparisons
+
+    def _calculate_z_only_fallback(
+        self,
+        mixture: GasMixture,
+        temperature_k: float,
+        pressure_pa: float,
+        volume_m3: Optional[float],
+        standard_T: float,
+        standard_P: float,
+        standard_name: Optional[str]
+    ) -> Optional[CalculationResult]:
+        """
+        Return a limited result when all CoolProp backends fail.
+
+        Only Z, density, molar mass, SG and volume conversion are estimated.
+        Enthalpy/entropy/Cp/Cv/phase information are intentionally left as NaN.
+        """
+        try:
+            comparisons = self._calculate_z_factor_comparison(mixture, temperature_k, pressure_pa)
+            ann10 = next(
+                (
+                    item for item in comparisons
+                    if item.method == "Standing-Katz ANN10"
+                    and item.valid
+                    and item.z_factor is not None
+                    and item.z_factor > 0
+                ),
+                None
+            )
+            if ann10 is None:
+                self.logger.warning("Standing-Katz ANN10 fallback unavailable or outside validity range")
+                return None
+
+            pseudo = self.z_factor_estimator.pseudo_critical(mixture)
+            z_actual = ann10.z_factor
+            density = self._density_from_z(pressure_pa, temperature_k, pseudo.molar_mass_kg_mol, z_actual)
+
+            standard_comparisons = self._calculate_z_factor_comparison(mixture, standard_T, standard_P)
+            std_ann10 = next(
+                (
+                    item for item in standard_comparisons
+                    if item.method == "Standing-Katz ANN10"
+                    and item.valid
+                    and item.z_factor is not None
+                    and item.z_factor > 0
+                ),
+                None
+            )
+            z_std = std_ann10.z_factor if std_ann10 is not None else 1.0
+            rho_std = self._density_from_z(standard_P, standard_T, pseudo.molar_mass_kg_mol, z_std)
+
+            try:
+                rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
+            except Exception:
+                rho_air = standard_P / (287.058 * standard_T)
+            sg = rho_std / rho_air
+
+            actual_results = ActualConditionResults(
+                temperature=temperature_k,
+                pressure=pressure_pa,
+                density=density,
+                molar_mass=pseudo.molar_mass_kg_mol,
+                compressibility_factor=z_actual,
+                internal_energy=math.nan,
+                enthalpy=math.nan,
+                entropy=math.nan,
+                cp=math.nan,
+                cv=math.nan,
+                isentropic_exponent=None,
+                speed_of_sound=None
+            )
+            standard_results = StandardConditionResults(
+                density_std=rho_std,
+                specific_gravity=sg,
+                reference_temperature=standard_T,
+                reference_pressure=standard_P,
+                standard_name=standard_name
+            )
+
+            heating_results = None
+            try:
+                hhv_mass, lhv_mass = self._calculate_heating_values_reference(mixture)
+                heating_results = self._package_heating_values(
+                    hhv_mass,
+                    lhv_mass,
+                    rho_std,
+                    sg,
+                    "Referans veri tabanı"
+                )
+            except Exception as e:
+                self.logger.info(f"Heating values unavailable in Z-only fallback: {e}")
+
+            volume_results = None
+            if volume_m3 is not None:
+                mass = density * volume_m3
+                volume_results = VolumeConversion(
+                    actual_volume=volume_m3,
+                    mass=mass,
+                    standard_volume=mass / rho_std,
+                    normal_volume=None,
+                    normal_volume_error="Z-only fallback normal hacim hesaplamaz"
+                )
+
+            return CalculationResult(
+                backend_used="Standing-Katz ANN10 (Z-only fallback)",
+                actual=actual_results,
+                standard=standard_results,
+                heating=heating_results,
+                volume_conversion=volume_results,
+                phase_envelope=None,
+                z_factor_comparison=comparisons,
+                z_fallback_warning=(
+                    "CoolProp HEOS/SRK/PR başarısız oldu; yalnızca Standing-Katz ANN10 "
+                    "ile Z ve yoğunluk tahmini yapıldı. Entalpi, entropi, Cp/Cv ve faz "
+                    "bilgileri bu fallbackte hesaplanmaz."
+                )
+            )
+        except Exception as e:
+            self.logger.warning(f"Standing-Katz ANN10 fallback failed: {e}")
+            return None
+
+    @staticmethod
+    def _density_from_z(pressure_pa: float, temperature_k: float, molar_mass: float, z_factor: float) -> float:
+        return pressure_pa * molar_mass / (z_factor * 8.314462618 * temperature_k)
     
     def _calculate_with_backend(
         self,
@@ -244,16 +473,49 @@ class ThermoCalculator:
         Returns:
             Calculation results
         """
-        # Create CoolProp state
-        state = self._create_state(mixture, temperature_k, pressure_pa, backend)
-        
-        # Calculate actual condition properties
-        actual_results = self._calculate_actual_conditions(state)
-        
-        # Calculate standard condition properties
-        standard_results = self._calculate_standard_conditions(
-            mixture, backend, standard_T, standard_P, standard_name
-        )
+        if backend in ["GERG-2008", "AGA8-Detail"]:
+            actual_results = self._calculate_aga8(mixture, temperature_k, pressure_pa, backend)
+            # Standart conditions
+            standard_results = StandardConditionResults(
+                density_std=1.0, specific_gravity=1.0, reference_temperature=standard_T, reference_pressure=standard_P, standard_name=standard_name
+            )
+            try:
+                std_res = self._calculate_aga8(mixture, standard_T, standard_P, backend)
+                standard_results.density_std = std_res.density
+                
+                # Air density calculation using ideal gas
+                rho_air = standard_P / (287.058 * standard_T)
+                try:
+                    rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
+                except: pass
+                
+                standard_results.specific_gravity = std_res.density / rho_air
+            except Exception as e:
+                self.logger.warning(f"Standard condition calculation failed with {backend}: {e}")
+                
+            state = None
+            phase_envelope = None
+            # Fallback to HEOS/SRK for phase envelope
+            try:
+                state = self._create_state(mixture, temperature_k, pressure_pa, "HEOS" if not mixture.check_heos_compatibility() else "SRK")
+                phase_envelope = self._calculate_phase_envelope(state, "HEOS" if not mixture.check_heos_compatibility() else "SRK")
+            except:
+                pass
+                
+        else:
+            # Create CoolProp state
+            state = self._create_state(mixture, temperature_k, pressure_pa, backend)
+            
+            # Calculate actual condition properties
+            actual_results = self._calculate_actual_conditions(state)
+            
+            # Calculate standard condition properties
+            standard_results = self._calculate_standard_conditions(
+                mixture, backend, standard_T, standard_P, standard_name
+            )
+            
+            # Calculate Phase Envelope
+            phase_envelope = self._calculate_phase_envelope(state, backend)
         
         # Calculate heating values
         # Note: We use the selected Standard T for combustion reference as well
@@ -270,19 +532,20 @@ class ThermoCalculator:
         # Calculate volume conversion if provided
         volume_results = None
         if volume_m3 is not None:
+            cp_backend = backend
+            if cp_backend in ["GERG-2008", "AGA8-Detail"]:
+                cp_backend = "HEOS" if not mixture.check_heos_compatibility() else "SRK"
+                
             volume_results = self._calculate_volume_conversion(
                 volume_m3,
                 actual_results.density,
                 standard_results.density_std,
                 mixture,
-                backend
+                cp_backend
             )
             
-        # Calculate Phase Envelope
-        phase_envelope = self._calculate_phase_envelope(state, backend)
-        
         # Package results
-        return CalculationResult(
+        result = CalculationResult(
             backend_used=backend,
             actual=actual_results,
             standard=standard_results,
@@ -290,7 +553,86 @@ class ThermoCalculator:
             volume_conversion=volume_results,
             phase_envelope=phase_envelope
         )
+        result.z_factor_comparison = self._calculate_z_factor_comparison(
+            mixture,
+            temperature_k,
+            pressure_pa
+        )
+        return result
     
+    def _calculate_aga8(self, mixture, temperature_k, pressure_pa, method="GERG-2008") -> ActualConditionResults:
+        if not PYAGA8_AVAILABLE:
+            raise BackendNotAvailableError(method)
+            
+        comp = pyaga8.Composition()
+        
+        aga8_mapping = {
+            'methane': 'methane', 'ethane': 'ethane', 'n-propane': 'propane', 'propane': 'propane',
+            'n-butane': 'n_butane', 'isobutane': 'isobutane', 'n-pentane': 'n_pentane',
+            'isopentane': 'isopentane', 'n-hexane': 'hexane', 'n-heptane': 'heptane',
+            'n-octane': 'octane', 'n-nonane': 'nonane', 'n-decane': 'decane',
+            'hydrogen': 'hydrogen', 'oxygen': 'oxygen', 'carbonmonoxide': 'carbon_monoxide',
+            'water': 'water', 'hydrogensulfide': 'hydrogen_sulfide', 'helium': 'helium',
+            'argon': 'argon', 'carbondioxide': 'carbon_dioxide', 'nitrogen': 'nitrogen'
+        }
+        
+        sum_fractions = 0.0
+        for gas in mixture.components:
+            coolprop_name = mixture._format_gas_name_for_coolprop(gas.name).lower()
+            aga8_name = aga8_mapping.get(coolprop_name)
+            if aga8_name:
+                val = gas.fraction / 100.0
+                setattr(comp, aga8_name, val)
+                sum_fractions += val
+            else:
+                self.logger.warning(f"Bileşen {gas.name} AGA8 standardında desteklenmiyor. Yoksayılıyor.")
+                
+        if sum_fractions < 0.99:
+            raise ValueError(f"AGA8 için geçerli gazların toplamı {sum_fractions} (< 0.99). AGA8 desteklenmiyor.")
+            
+        # Normalize just in case of float precision issues
+        if abs(sum_fractions - 1.0) > 1e-5:
+            # We must normalize to exactly 1.0 for pyaga8 to avoid BadSum panic
+            for gas in mixture.components:
+                coolprop_name = mixture._format_gas_name_for_coolprop(gas.name).lower()
+                aga8_name = aga8_mapping.get(coolprop_name)
+                if aga8_name:
+                    current = getattr(comp, aga8_name)
+                    setattr(comp, aga8_name, current / sum_fractions)
+                    
+        engine = pyaga8.Gerg2008() if method == "GERG-2008" else pyaga8.Detail()
+        try:
+            engine.set_composition(comp)
+        except Exception as e:
+            raise ValueError(f"AGA8 set_composition hatası: {e}")
+        engine.temperature = temperature_k
+        engine.pressure = pressure_pa / 1000.0
+        
+        engine.calc_density(0)
+        engine.calc_properties()
+        
+        density_kg_m3 = engine.d * engine.mm               
+        enthalpy_kj_kg = engine.h / engine.mm              
+        entropy_kj_kg_k = engine.s / engine.mm             
+        internal_energy_kj_kg = engine.u / engine.mm       
+        cp_kj_kg_k = engine.cp / engine.mm                 
+        cv_kj_kg_k = engine.cv / engine.mm                 
+        
+        return ActualConditionResults(
+            temperature=temperature_k,
+            pressure=pressure_pa,
+            density=density_kg_m3,
+            molar_mass=engine.mm / 1000.0,
+            compressibility_factor=engine.z,
+            internal_energy=internal_energy_kj_kg,
+            enthalpy=enthalpy_kj_kg,
+            entropy=entropy_kj_kg_k,
+            cp=cp_kj_kg_k,
+            cv=cv_kj_kg_k,
+            isentropic_exponent=engine.kappa,
+            speed_of_sound=engine.w
+        )
+
     def _create_state(
         self,
         mixture: GasMixture,
@@ -480,6 +822,10 @@ class ThermoCalculator:
         T_ref: float,
         P_ref: float
     ) -> Optional[HeatingValues]:
+        # CoolProp API requires CoolProp backends
+        if backend in ["GERG-2008", "AGA8-Detail"]:
+            backend = "HEOS" if not mixture.check_heos_compatibility() else "SRK"
+
         """
         Calculate heating values with 3-stage fallback.
         

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Input panel component.
 
 Handles user inputs for gas composition, thermodynamic conditions, and calculation settings.
@@ -14,12 +14,12 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from natural_gas_g5.models.gas_data import GasComponent, GasMixture
-from natural_gas_g5.core.exceptions import ValidationError
-from natural_gas_g5.core import validators
-from natural_gas_g5.core import converters
-from natural_gas_g5.core.converters import VolumeUnit, convert_volume_to_m3
-from natural_gas_g5.config.settings import config
+from natural_gas_main.models.gas_data import GasComponent, GasMixture
+from natural_gas_main.core.exceptions import ValidationError
+from natural_gas_main.core import validators
+from natural_gas_main.core import converters
+from natural_gas_main.core.converters import VolumeUnit, convert_volume_to_m3
+from natural_gas_main.config.settings import config
 
 
 class InputPanel(ctk.CTkFrame):
@@ -359,7 +359,7 @@ class InputPanel(ctk.CTkFrame):
         """Handle add gas button click."""
         selection = self.gas_listbox.curselection()
         if not selection:
-            from natural_gas_g5.ui.dialogs import show_warning
+            from natural_gas_main.ui.dialogs import show_warning
             show_warning("Giriş Hatası", "Lütfen bir gaz seçin.")
             return
 
@@ -367,7 +367,7 @@ class InputPanel(ctk.CTkFrame):
         
         # Check for duplicates
         if gas_name in self.comp_rows:
-            from natural_gas_g5.ui.dialogs import show_warning
+            from natural_gas_main.ui.dialogs import show_warning
             show_warning("Giriş Hatası", f"{gas_name} zaten ekli.")
             return
 

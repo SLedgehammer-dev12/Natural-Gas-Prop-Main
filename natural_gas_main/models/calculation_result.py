@@ -5,9 +5,10 @@ Defines structured data models for storing thermodynamic calculation results.
 """
 
 from typing import Optional, Dict, List, Tuple, Any
+import math
 from pydantic import BaseModel, Field
 
-from natural_gas_g5.utils.result_unit_converter import ResultUnitConverter, UnitSystem
+from natural_gas_main.utils.result_unit_converter import ResultUnitConverter, UnitSystem
 
 
 class ActualConditionResults(BaseModel):
@@ -93,6 +94,25 @@ class PhaseEnvelopeData(BaseModel):
     model_config = {"frozen": False}
 
 
+class ZFactorComparison(BaseModel):
+    """Optional engineering Z-factor estimate for comparison/fallback."""
+
+    method: str = Field(..., description="Z-factor estimation method")
+    z_factor: Optional[float] = Field(None, description="Estimated Z-factor")
+    density: Optional[float] = Field(None, description="Mass density (kg/m³)")
+    molar_mass: Optional[float] = Field(None, description="Molar mass (kg/mol)")
+    enthalpy: Optional[float] = Field(None, description="Specific enthalpy (kJ/kg)")
+    entropy: Optional[float] = Field(None, description="Specific entropy (kJ/kg·K)")
+    cp: Optional[float] = Field(None, description="Specific heat at constant pressure (kJ/kg·K)")
+    cv: Optional[float] = Field(None, description="Specific heat at constant volume (kJ/kg·K)")
+    ppr: float = Field(..., description="Pseudo-reduced pressure")
+    tpr: float = Field(..., description="Pseudo-reduced temperature")
+    valid: bool = Field(..., description="True if within method validity range")
+    warning: Optional[str] = Field(None, description="Validity or calculation warning")
+
+    model_config = {"frozen": False}
+
+
 class CalculationResult(BaseModel):
     """
     Complete calculation results container.
@@ -106,6 +126,8 @@ class CalculationResult(BaseModel):
     heating: Optional[HeatingValues] = Field(None, description="Heating values (if calculable)")
     volume_conversion: Optional[VolumeConversion] = Field(None, description="Volume conversion (if provided)")
     phase_envelope: Optional[PhaseEnvelopeData] = Field(None, description="Phase envelope data for plotting")
+    z_factor_comparison: List[ZFactorComparison] = Field(default_factory=list, description="Standing-Katz/DAK Z estimates")
+    z_fallback_warning: Optional[str] = Field(None, description="Warning if result is Z-only fallback")
     
     def to_display_list(self, unit_system: str = "SI") -> List[Tuple[str, str, str]]:
         """
@@ -130,16 +152,18 @@ class CalculationResult(BaseModel):
         # Header - Actual Conditions
         results.append(("- GERÇEK KOŞULLAR SONUÇLARI -", "", ""))
         results.append(("Hesaplama Yöntemi (Termo)", self.backend_used, ""))
+        if self.z_fallback_warning:
+            results.append(("Sınırlı Fallback Uyarısı", self.z_fallback_warning, ""))
         
         # Density
         density_val, density_unit = ResultUnitConverter.convert_density(
             self.actual.density, prefs['density']
         )
-        results.append(("Yoğunluk (Gerçek - ρ)", f"{density_val:.4f}", density_unit))
+        results.append(("Yoğunluk (Gerçek - ρ)", self._format_float(density_val, 4), density_unit))
         
-        results.append(("Mol Kütlesi (Karışım - M)", f"{self.actual.molar_mass:.4f}", "kg/mol"))
-        results.append(("Sıkıştırılabilirlik Faktörü (Z)", f"{self.actual.compressibility_factor:.5f}", "-"))
-        
+        results.append(("Mol Kütlesi (Karışım - M)", self._format_float(self.actual.molar_mass, 4), "kg/mol"))
+        results.append(("Sıkıştırılabilirlik Faktörü (Z)", self._format_float(self.actual.compressibility_factor, 5), "-"))
+
         # Energy properties
         u_val, u_unit = ResultUnitConverter.convert_energy_mass(
             self.actual.internal_energy, prefs['energy_mass']
@@ -157,14 +181,14 @@ class CalculationResult(BaseModel):
             self.actual.cv, prefs['entropy']
         )
         
-        results.append(("İç Enerji (u)", f"{u_val:.4f}", u_unit))
-        results.append(("Entalpi (h)", f"{h_val:.4f}", h_unit))
-        results.append(("Entropi (s)", f"{s_val:.4f}", s_unit))
-        results.append(("Cp", f"{cp_val:.4f}", cp_unit))
-        results.append(("Cv", f"{cv_val:.4f}", cv_unit))
+        results.append(("İç Enerji (u)", self._format_float(u_val, 4), u_unit))
+        results.append(("Entalpi (h)", self._format_float(h_val, 4), h_unit))
+        results.append(("Entropi (s)", self._format_float(s_val, 4), s_unit))
+        results.append(("Cp", self._format_float(cp_val, 4), cp_unit))
+        results.append(("Cv", self._format_float(cv_val, 4), cv_unit))
         
         if self.actual.isentropic_exponent is not None:
-            results.append(("İzotropik Üs (k)", f"{self.actual.isentropic_exponent:.4f}", "-"))
+            results.append(("İzotropik Üs (k)", self._format_float(self.actual.isentropic_exponent, 4), "-"))
         else:
             results.append(("İzotropik Üs (k)", "Hesaplanamadı", "-"))
         
@@ -172,7 +196,7 @@ class CalculationResult(BaseModel):
             speed_val, speed_unit = ResultUnitConverter.convert_speed(
                 self.actual.speed_of_sound, prefs['speed']
             )
-            results.append(("Ses Hızı (a)", f"{speed_val:.2f}", speed_unit))
+            results.append(("Ses Hızı (a)", self._format_float(speed_val, 2), speed_unit))
         else:
             results.append(("Ses Hızı (a)", "Hesaplanamadı", "-"))
         
@@ -273,5 +297,12 @@ class CalculationResult(BaseModel):
             Dictionary representation of all results
         """
         return self.model_dump()
+
+    @staticmethod
+    def _format_float(value: float, decimals: int) -> str:
+        """Format finite floats and hide unavailable fallback-only properties."""
+        if value is None or not math.isfinite(value):
+            return "Hesaplanamadı"
+        return f"{value:.{decimals}f}"
     
     model_config = {"frozen": False}

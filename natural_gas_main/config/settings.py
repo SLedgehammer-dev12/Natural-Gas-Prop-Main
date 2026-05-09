@@ -108,7 +108,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.1 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.3 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -140,11 +140,11 @@ class AppConfig(BaseModel):
     
     # Calculation Settings
     DEFAULT_BACKEND: str = Field(
-        default="HEOS",
-        description="Default CoolProp backend"
+        default="GERG-2008",
+        description="Default CoolProp/AGA8 backend"
     )
     AVAILABLE_BACKENDS: List[str] = Field(
-        default=["HEOS", "SRK", "PR"],
+        default=["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"],
         description="Available thermodynamic backends"
     )
     
@@ -207,7 +207,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.1",
+        default="v1.3",
         description="Current application version"
     )
     REPO_USER: str = Field(

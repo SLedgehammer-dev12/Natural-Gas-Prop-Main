@@ -14,7 +14,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 import numpy as np
 
-from natural_gas_g5.models.calculation_result import CalculationResult, PhaseEnvelopeData
+from natural_gas_main.models.calculation_result import CalculationResult, PhaseEnvelopeData
 
 
 class OutputPanel(ctk.CTkFrame):
@@ -60,26 +60,27 @@ class OutputPanel(ctk.CTkFrame):
         
         # KPI variables
         self.kpis = {
-            "Z-Faktörü": {"var": ctk.StringVar(value="-"), "unit": ""},
-            "Yoğunluk": {"var": ctk.StringVar(value="-"), "unit": "kg/m³"},
-            "Mol Kütlesi": {"var": ctk.StringVar(value="-"), "unit": "kg/mol"},
-            "HHV": {"var": ctk.StringVar(value="-"), "unit": "MJ/Sm³"}
+            "Z-Faktörü": {"var": ctk.StringVar(value="-"), "unit": "", "title_var": ctk.StringVar(value="Z-Faktörü")},
+            "Yoğunluk": {"var": ctk.StringVar(value="-"), "unit": "kg/m³", "title_var": ctk.StringVar(value="Yoğunluk")},
+            "Mol Kütlesi": {"var": ctk.StringVar(value="-"), "unit": "kg/mol", "title_var": ctk.StringVar(value="Mol Kütlesi")},
+            "HHV": {"var": ctk.StringVar(value="-"), "unit": "MJ/Sm³", "title_var": ctk.StringVar(value="HHV")}
         }
         
-        cols = len(self.kpis)
         for i, (title, data) in enumerate(self.kpis.items()):
             card = ctk.CTkFrame(self.kpi_frame, corner_radius=10, fg_color=("gray85", "gray25"))
             card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
             
-            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12)).pack(pady=(5, 0))
+            ctk.CTkLabel(card, textvariable=data["title_var"], font=ctk.CTkFont(size=12)).pack(pady=(5, 0))
             ctk.CTkLabel(
                 card, 
                 textvariable=data["var"], 
                 font=ctk.CTkFont(size=18, weight="bold"),
                 text_color="#4CAF50"
             ).pack()
-            if data["unit"]:
-                ctk.CTkLabel(card, text=data["unit"], font=ctk.CTkFont(size=10)).pack(pady=(0, 5))
+            
+            # Unit label var since we want to change it dynamically
+            data["unit_var"] = ctk.StringVar(value=data["unit"])
+            ctk.CTkLabel(card, textvariable=data["unit_var"], font=ctk.CTkFont(size=10)).pack(pady=(0, 5))
         
         # --- UNIT SELECTOR & TREEVIEW ---
         unit_select_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
@@ -146,6 +147,38 @@ class OutputPanel(ctk.CTkFrame):
         
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.results_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # --- SECONDARY TREEVIEW FOR COMPARISON ---
+        comp_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
+        comp_frame.pack(fill=tk.X, pady=(10, 0))
+        ctk.CTkLabel(comp_frame, text="Yöntem Karşılaştırması (Z-Faktörü ve Temel Değerler)", font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+        
+        comp_cols = ("Özellik", "Birim", "GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR", "Katz", "DAK")
+        self.comp_tree = ttk.Treeview(
+            results_tab,
+            columns=comp_cols,
+            show="headings",
+            height=6
+        )
+        
+        for col in comp_cols:
+            self.comp_tree.heading(col, text=col)
+            if col == "Özellik":
+                self.comp_tree.column(col, width=150)
+            elif col == "Birim":
+                self.comp_tree.column(col, width=60)
+            else:
+                self.comp_tree.column(col, width=90)
+                
+        comp_scrollbar = ttk.Scrollbar(
+            results_tab,
+            orient=tk.VERTICAL,
+            command=self.comp_tree.yview
+        )
+        self.comp_tree.configure(yscrollcommand=comp_scrollbar.set)
+        
+        comp_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.comp_tree.pack(fill=tk.X, pady=(5, 5))
         
         # Configure tag styles
         self.results_tree.tag_configure(
@@ -384,7 +417,15 @@ class OutputPanel(ctk.CTkFrame):
         
         # Update KPIs
         # Reset KPIs
-        for k in self.kpis: self.kpis[k]["var"].set("-")
+        for k in self.kpis: 
+            self.kpis[k]["var"].set("-")
+            
+        self.kpis["Z-Faktörü"]["title_var"].set(f"Z-Faktörü\n({result.backend_used})")
+        self.kpis["Yoğunluk"]["title_var"].set(f"Yoğunluk\n({result.backend_used})")
+        self.kpis["Mol Kütlesi"]["title_var"].set(f"Mol Kütlesi\n({result.backend_used})")
+        
+        heating_method = result.heating.calculation_method if result.heating else "Bulunamadı"
+        self.kpis["HHV"]["title_var"].set(f"HHV\n({heating_method})")
         
         # Find required values in display list
         for prop, val, unit in results_list:
@@ -392,12 +433,12 @@ class OutputPanel(ctk.CTkFrame):
                 self.kpis["Z-Faktörü"]["var"].set(val)
             elif "Gerçek - ρ" in prop:
                 self.kpis["Yoğunluk"]["var"].set(val)
-                self.kpis["Yoğunluk"]["unit"] = unit # Update unit
+                self.kpis["Yoğunluk"]["unit_var"].set(unit) # Update unit
             elif "Mol Kütlesi" in prop:
                 self.kpis["Mol Kütlesi"]["var"].set(val)
             elif "(Hacimsel)" in prop and "HHV" in prop:
                 self.kpis["HHV"]["var"].set(val)
-                self.kpis["HHV"]["unit"] = unit
+                self.kpis["HHV"]["unit_var"].set(unit)
         
         # Insert into tree
         for prop_name, value, unit in results_list:
@@ -407,6 +448,41 @@ class OutputPanel(ctk.CTkFrame):
             else:
                 # Normal row
                 self.results_tree.insert("", tk.END, values=(prop_name, value, unit))
+                
+        # Populate Comparison Tree
+        if hasattr(self, 'comp_tree') and result.z_factor_comparison:
+            comp_methods = [
+                ("GERG-2008", "GERG-2008"), 
+                ("AGA8-Detail", "AGA8-Detail"), 
+                ("HEOS", "HEOS"), 
+                ("SRK", "SRK"), 
+                ("PR", "PR"), 
+                ("Katz", "Standing-Katz ANN10"), 
+                ("DAK", "Dranchuk-Abou-Kassem")
+            ]
+            comp_map = {c.method: c for c in result.z_factor_comparison}
+            
+            def _get_val(method_name, attr_name, decimals):
+                c = comp_map.get(method_name)
+                if not c: return "-"
+                val = getattr(c, attr_name, None)
+                if val is None: return "-"
+                return f"{val:.{decimals}f}"
+                
+            rows = [
+                ("Z-Faktörü", "-", "z_factor", 5),
+                ("Yoğunluk (ρ)", "kg/m³", "density", 4),
+                ("Mol Kütlesi (M)", "kg/mol", "molar_mass", 4),
+                ("Entalpi (h)", "kJ/kg", "enthalpy", 4),
+                ("Entropi (s)", "kJ/kg·K", "entropy", 4),
+                ("İzobarik Isı Kap. (Cp)", "kJ/kg·K", "cp", 4),
+            ]
+            
+            for row_name, unit, attr_name, decimals in rows:
+                row_vals = [row_name, unit]
+                for col_name, method_name in comp_methods:
+                    row_vals.append(_get_val(method_name, attr_name, decimals))
+                self.comp_tree.insert("", tk.END, values=row_vals)
                 
         # Update Phase Envelope
         if result.phase_envelope:
@@ -476,6 +552,9 @@ class OutputPanel(ctk.CTkFrame):
         """Clear all results from tree view."""
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
+        if hasattr(self, 'comp_tree'):
+            for item in self.comp_tree.get_children():
+                self.comp_tree.delete(item)
     
     def get_results_as_list(self) -> List[Tuple[str, str, str]]:
         """

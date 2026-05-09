@@ -15,6 +15,53 @@ from fpdf import FPDF
 
 class ReportGenerator:
     """Generates formatted text reports from calculation results."""
+
+    @staticmethod
+    def _setup_pdf_font(pdf: FPDF) -> str:
+        """
+        Register a Unicode TrueType font for Turkish characters and symbols.
+
+        FPDF core fonts such as Helvetica/Arial are Latin-1 only. Using them
+        with text like "DOĞAL", "Özellik", "m³" or "ρ" raises an exception.
+        """
+        font_sets = []
+
+        try:
+            from matplotlib import font_manager
+
+            regular = font_manager.findfont("DejaVu Sans", fallback_to_default=False)
+            bold = font_manager.findfont("DejaVu Sans:style=normal:weight=bold", fallback_to_default=False)
+            italic = font_manager.findfont("DejaVu Sans:style=oblique", fallback_to_default=False)
+            font_sets.append(("DejaVu", regular, bold, italic))
+        except Exception:
+            pass
+
+        font_sets.extend([
+            (
+                "ArialUnicode",
+                r"C:\Windows\Fonts\arial.ttf",
+                r"C:\Windows\Fonts\arialbd.ttf",
+                r"C:\Windows\Fonts\ariali.ttf",
+            ),
+            (
+                "SegoeUI",
+                r"C:\Windows\Fonts\segoeui.ttf",
+                r"C:\Windows\Fonts\segoeuib.ttf",
+                r"C:\Windows\Fonts\segoeuii.ttf",
+            ),
+        ])
+
+        for family, regular, bold, italic in font_sets:
+            if not regular or not os.path.exists(regular):
+                continue
+            pdf.add_font(family, "", regular)
+            pdf.add_font(family, "B", bold if bold and os.path.exists(bold) else regular)
+            pdf.add_font(family, "I", italic if italic and os.path.exists(italic) else regular)
+            return family
+
+        raise RuntimeError(
+            "PDF raporu için Unicode font bulunamadı. DejaVu Sans veya Windows Arial/Segoe UI fontları gerekli."
+        )
     
     @staticmethod
     def generate_text_report(
@@ -200,25 +247,23 @@ class ReportGenerator:
         """
         pdf = FPDF()
         pdf.add_page()
+        font_family = ReportGenerator._setup_pdf_font(pdf)
         
-        # Unicode support - using a standard font that usually supports many characters
-        # Note: If special symbols are needed, we might need to bundle a TTF font.
-        # For now we use standard fonts and sanitization.
-        pdf.set_font("Arial", "B", 16)
+        pdf.set_font(font_family, "B", 16)
         
         # Header
         pdf.set_fill_color(240, 240, 240)
         pdf.cell(0, 15, "DOĞAL GAZ ÖZELLİKLERİ HESAPLAMA RAPORU", ln=True, align='C', fill=True)
-        pdf.set_font("Arial", "", 10)
+        pdf.set_font(font_family, "", 10)
         pdf.cell(0, 8, f"Rapor Tarihi: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='R')
         pdf.ln(5)
         
         # Section 1: Inputs
-        pdf.set_font("Arial", "B", 12)
+        pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141) # Dark Blue
         pdf.cell(0, 10, "1. GİRİLEN PARAMETRELER", ln=True)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Arial", "", 10)
+        pdf.set_font(font_family, "", 10)
         
         input_data = [
             ["Sıcaklık", input_params.get('temperature', 'N/A')],
@@ -236,17 +281,17 @@ class ReportGenerator:
         pdf.ln(5)
         
         # Section 2: Composition Table
-        pdf.set_font("Arial", "B", 12)
+        pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141)
         pdf.cell(0, 10, "2. GAZ KOMPOZİSYONU", ln=True)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Arial", "B", 10)
+        pdf.set_font(font_family, "B", 10)
         
         # Table Header
         pdf.cell(90, 8, "Bileşen", border=1, fill=True)
         pdf.cell(0, 8, "Oran (%)", border=1, fill=True, ln=True, align='C')
         
-        pdf.set_font("Arial", "", 10)
+        pdf.set_font(font_family, "", 10)
         for gas, frac in gas_composition:
             pdf.cell(90, 8, f" {gas}", border=1)
             pdf.cell(0, 8, f"{frac:>8.4f}", border=1, ln=True, align='C')
@@ -268,25 +313,25 @@ class ReportGenerator:
         if pdf.get_y() > 200:
             pdf.add_page()
             
-        pdf.set_font("Arial", "B", 12)
+        pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141)
         pdf.cell(0, 10, "3. HESAPLAMA SONUÇLARI", ln=True)
         pdf.set_text_color(0, 0, 0)
         
         # Results Table
-        pdf.set_font("Arial", "B", 10)
+        pdf.set_font(font_family, "B", 10)
         pdf.cell(100, 8, "Özellik", border=1, fill=True)
         pdf.cell(50, 8, "Değer", border=1, fill=True, align='C')
         pdf.cell(0, 8, "Birim", border=1, fill=True, ln=True, align='C')
         
-        pdf.set_font("Arial", "", 9)
+        pdf.set_font(font_family, "", 9)
         for prop, value, unit in results:
             if prop.startswith('-'):
                 # Section header
-                pdf.set_font("Arial", "I", 9)
+                pdf.set_font(font_family, "I", 9)
                 pdf.set_fill_color(245, 245, 245)
                 pdf.cell(0, 7, prop.strip('- '), ln=True, fill=True, border=1)
-                pdf.set_font("Arial", "", 9)
+                pdf.set_font(font_family, "", 9)
             else:
                 pdf.cell(100, 7, f" {prop}", border=1)
                 pdf.cell(50, 7, value, border=1, align='C')
@@ -294,7 +339,7 @@ class ReportGenerator:
         
         # Footer
         pdf.set_y(-20)
-        pdf.set_font("Arial", "I", 8)
+        pdf.set_font(font_family, "I", 8)
         pdf.cell(0, 10, f"Sayfa {pdf.page_no()}", align='C')
         pdf.cell(0, 10, "Natural Gas Prop Main © 2026 Kompresör Pompa", align='R')
         

@@ -1,6 +1,6 @@
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.models.gas_data import GasComponent, GasMixture
-from natural_gas_g5.models.heating_value_db import get_reference_heating_values
+﻿from natural_gas_main.config.settings import config
+from natural_gas_main.models.gas_data import GasComponent, GasMixture
+from natural_gas_main.models.heating_value_db import get_reference_heating_values
 
 
 def test_natural_gas_focus_catalog_contains_expected_components():

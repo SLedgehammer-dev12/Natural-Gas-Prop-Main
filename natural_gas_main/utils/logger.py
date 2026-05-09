@@ -1,4 +1,4 @@
-"""
+﻿"""
 Logging configuration and utilities.
 
 Centralizes logging setup for the application.
@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from natural_gas_g5.config.settings import config
+from natural_gas_main.config.settings import config
 
 
 def setup_logging(

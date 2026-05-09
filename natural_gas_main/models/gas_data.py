@@ -1,4 +1,4 @@
-"""
+﻿"""
 Gas data models and mixture handling.
 
 Defines Pydantic models for gas components and mixtures with validation.
@@ -8,8 +8,8 @@ from typing import List, Literal
 from pydantic import BaseModel, Field, field_validator, computed_field
 import re
 
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.core.exceptions import ValidationError
+from natural_gas_main.config.settings import config
+from natural_gas_main.core.exceptions import ValidationError
 
 
 class GasComponent(BaseModel):

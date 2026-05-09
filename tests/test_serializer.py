@@ -1,6 +1,6 @@
-import pytest
+﻿import pytest
 
-from natural_gas_g5.utils.data_serializer import (
+from natural_gas_main.utils.data_serializer import (
     DataSerializationError,
     load_inputs_from_file,
     save_inputs_to_file,

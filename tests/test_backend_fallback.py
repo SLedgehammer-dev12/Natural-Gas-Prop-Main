@@ -1,5 +1,5 @@
-from natural_gas_g5.models.calculator import COOLPROP_AVAILABLE, ThermoCalculator
-from natural_gas_g5.models.gas_data import GasComponent, GasMixture
+﻿from natural_gas_main.models.calculator import COOLPROP_AVAILABLE, ThermoCalculator
+from natural_gas_main.models.gas_data import GasComponent, GasMixture
 
 import pytest
 

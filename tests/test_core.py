@@ -1,6 +1,6 @@
-import unittest
-from natural_gas_g5.core import converters
-from natural_gas_g5.core.converters import VolumeUnit, PressureUnit, TemperatureUnit
+﻿import unittest
+from natural_gas_main.core import converters
+from natural_gas_main.core.converters import VolumeUnit, PressureUnit, TemperatureUnit
 
 class TestConverters(unittest.TestCase):
     def test_temperature_conversion(self):

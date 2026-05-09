@@ -1,4 +1,4 @@
-"""
+﻿"""
 Natural Gas Prop Main - Ana Başlatıcı
 
 Uygulamayı başlatır ve GUI'yi gösterir.
@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 
 # Import from package
-from natural_gas_g5.utils.logger import setup_logging
-from natural_gas_g5.config.settings import config
+from natural_gas_main.utils.logger import setup_logging
+from natural_gas_main.config.settings import config
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     
     try:
         # Import UI (delayed to avoid import errors if tkinter not available)
-        from natural_gas_g5.ui.app import ThermoApp
+        from natural_gas_main.ui.app import ThermoApp
         
         # Create and run application
         logger.info("GUI oluşturuluyor...")

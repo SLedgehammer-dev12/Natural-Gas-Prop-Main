@@ -9,7 +9,7 @@ from typing import List, Optional
 import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
-from natural_gas_g5.config import preferences
+from natural_gas_main.config import preferences
 
 
 def show_heos_compatibility_warning(
@@ -112,10 +112,10 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.1 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.3 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.1 sürümü ile hesaplama güvenilirliği ve fallback davranışı iyileştirilmiştir.\n\n"
+        "v1.3 sürümü ile AGA8 (GERG-2008 ve AGA8-Detail) motorları ve gelişmiş yan yana yöntem karşılaştırma tablosu eklenmiştir.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -123,7 +123,7 @@ def show_about_dialog() -> None:
 
 def show_user_guide_dialog() -> None:
     """Show user guide information."""
-    from natural_gas_g5.config.settings import config
+    from natural_gas_main.config.settings import config
     
     guide_text = (
         "KULLANIM KILAVUZU - Natural Gas Prop Main\n\n"
@@ -152,10 +152,10 @@ def show_user_guide_dialog() -> None:
 
 
 def show_new_features_info() -> None:
-    """Show new features information for v1.1 with do not show again option."""
+    """Show new features information for v1.3 with do not show again option."""
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.1")
+    dialog.title("Yenilikler - Sürüm v1.3")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
@@ -176,7 +176,11 @@ def show_new_features_info() -> None:
     
     # Info Text
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.1):\n"
+        "🌟 YENİ ÖZELLİKLER (v1.3):\n"
+        "• Z faktörü için Standing-Katz ANN10/ANN5 ve DAK karşılaştırması.\n"
+        "• CoolProp backendleri başarısız olursa geçerlilik uyarılı ANN10 Z-only fallback.\n"
+        "• AGA8 referans hesaplayıcısıyla doğrulanan Z karşılaştırmaları.\n\n"
+        "🌟 ÖNCEKİ ÖZELLİKLER (v1.1):\n"
         "• 📈 Faz Diyagramı: Karışımlarınız için çiğlenme/kaynama noktası eğrilerini görün.\n"
         "• 📄 Profesyonel PDF Raporu: Hesaplamalarınızı grafikler içeren şık PDF'lere dönüştürün.\n"
         "• 🥧 Bileşen Pasta Grafiği: Gaz kompozisyonunu görsel olarak anlık takip edin.\n"

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Input validation utilities.
 
 Provides comprehensive validation for user inputs with detailed error messages.
@@ -6,8 +6,8 @@ Provides comprehensive validation for user inputs with detailed error messages.
 
 from typing import Optional, List
 
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.core.exceptions import ValidationError
+from natural_gas_main.config.settings import config
+from natural_gas_main.core.exceptions import ValidationError
 
 
 def validate_numeric_input(

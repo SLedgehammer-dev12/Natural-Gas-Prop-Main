@@ -1,4 +1,4 @@
-"""
+﻿"""
 Main application window.
 
 Coordinates between input panel, output panel, calculator, and user interactions.
@@ -13,19 +13,19 @@ import logging
 import os
 from pathlib import Path
 
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.config import preferences
-from natural_gas_g5.models.calculator import ThermoCalculator, COOLPROP_AVAILABLE
-from natural_gas_g5.core.exceptions import (
+from natural_gas_main.config.settings import config
+from natural_gas_main.config import preferences
+from natural_gas_main.models.calculator import ThermoCalculator, COOLPROP_AVAILABLE
+from natural_gas_main.core.exceptions import (
     ValidationError,
     BackendNotAvailableError,
     ThermoCalculationError
 )
-from natural_gas_g5.ui.input_panel import InputPanel
-from natural_gas_g5.ui.output_panel import OutputPanel
-from natural_gas_g5.ui import dialogs
-from natural_gas_g5.utils.report_generator import ReportGenerator
-from natural_gas_g5.utils.data_serializer import (
+from natural_gas_main.ui.input_panel import InputPanel
+from natural_gas_main.ui.output_panel import OutputPanel
+from natural_gas_main.ui import dialogs
+from natural_gas_main.utils.report_generator import ReportGenerator
+from natural_gas_main.utils.data_serializer import (
     save_inputs_to_file,
     load_inputs_from_file,
     validate_loaded_data,
@@ -33,7 +33,7 @@ from natural_gas_g5.utils.data_serializer import (
     FILE_EXTENSION,
     FILE_TYPE_NAME
 )
-from natural_gas_g5.utils.updater import UpdateChecker
+from natural_gas_main.utils.updater import UpdateChecker
 
 
 class ThermoApp(ctk.CTk):

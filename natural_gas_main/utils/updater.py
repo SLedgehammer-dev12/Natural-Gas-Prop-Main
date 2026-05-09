@@ -1,4 +1,4 @@
-"""
+﻿"""
 Update checker utility.
 
 Handles checking for updates from remote GitHub repository.
@@ -11,7 +11,7 @@ import webbrowser
 from typing import Tuple, Optional, Dict, Any
 from packaging import version
 
-from natural_gas_g5.config.settings import config
+from natural_gas_main.config.settings import config
 
 
 class UpdateChecker:

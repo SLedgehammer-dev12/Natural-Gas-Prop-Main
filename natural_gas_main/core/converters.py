@@ -1,4 +1,4 @@
-"""
+﻿"""
 Unit conversion utilities.
 
 Provides type-safe temperature and pressure conversions with comprehensive
@@ -8,8 +8,8 @@ unit support.
 from enum import Enum
 from typing import Union
 
-from natural_gas_g5.config.settings import config
-from natural_gas_g5.core.exceptions import ValidationError
+from natural_gas_main.config.settings import config
+from natural_gas_main.core.exceptions import ValidationError
 
 
 class TemperatureUnit(str, Enum):

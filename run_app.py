@@ -1,4 +1,4 @@
-"""
+﻿"""
 Natural Gas Prop Main - Basit Başlatıcı
 
 Bu dosyayı direkt çalıştırabilirsiniz:
@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Import and run main
-from natural_gas_g5.main import main
+from natural_gas_main.main import main
 
 if __name__ == "__main__":
     main()

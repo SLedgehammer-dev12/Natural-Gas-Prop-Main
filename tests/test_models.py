@@ -1,6 +1,6 @@
-import unittest
-from natural_gas_g5.models.gas_data import GasComponent, GasMixture
-from natural_gas_g5.core.exceptions import ValidationError
+﻿import unittest
+from natural_gas_main.models.gas_data import GasComponent, GasMixture
+from natural_gas_main.core.exceptions import ValidationError
 
 class TestGasModels(unittest.TestCase):
     def test_component_validation(self):
