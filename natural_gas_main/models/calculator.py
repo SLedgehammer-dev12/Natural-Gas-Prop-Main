@@ -1,4 +1,4 @@
-﻿"""
+"""
 Thermodynamic calculator module.
 
 Provides the core calculation engine using CoolProp, independent of UI.
@@ -608,7 +608,10 @@ class ThermoCalculator:
         engine.temperature = temperature_k
         engine.pressure = pressure_pa / 1000.0
         
-        engine.calc_density(0)
+        if method == "GERG-2008":
+            engine.calc_density(0)
+        else:
+            engine.calc_density()
         engine.calc_properties()
         
         density_kg_m3 = engine.d * engine.mm               
