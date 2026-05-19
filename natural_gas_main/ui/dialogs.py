@@ -29,8 +29,8 @@ def show_heos_compatibility_warning(
     gases_str = ", ".join(incompatible_gases)
     
     message = (
-        f"HEOS Backend Uyumluluk Uyarısı\n\n"
-        f"Seçilen karışım HEOS backend'i için tam karışım desteğine sahip değil.\n"
+        f"HEOS Uyumluluk Uyarısı\n\n"
+        f"Seçilen karışım HEOS yöntemi için tam karışım desteğine sahip değil.\n"
         f"Uyumsuz gazlar: {gases_str}\n\n"
         f"KRİTİK UYARI: HEOS ile devam etmek hatalı sonuçlara yol açabilir.\n\n"
         f"Doğruluk için SRK yöntemine otomatik geçiş yapılsın mı?\n"
@@ -45,7 +45,7 @@ def show_heos_compatibility_warning(
     
     if result:
         messagebox.showinfo(
-            "Backend Değişikliği",
+            "Yöntem Değişikliği",
             "Hesaplama HEOS yerine SRK yöntemi ile devam edecek."
         )
     else:
@@ -67,12 +67,12 @@ def show_heating_value_method_warning(method: str) -> None:
     """
     if method == "Bileşen bazlı":
         messagebox.showwarning(
-            "Isıl Değer Hesaplama Uyarısı ⚠️",
-            "CoolProp yerleşik modeli ısıl değerleri doğrudan hesaplayamadığı için,\n"
-            "daha sağlam 'Bileşen Bazlı Toplama' yöntemi kullanılmıştır.\n\n"
-            "Bu yöntem karışım etkileşimlerini ihmal eder ve CoolProp yerleşik\n"
-            "hesabına göre daha düşük doğrulukta olabilir.\n\n"
-            "**Sonuçları mühendislik onayı ile kullanınız.**"
+        "Isıl Değer Hesaplama Uyarısı",
+        "CoolProp yerleşik modeli ısıl değerleri doğrudan hesaplayamadığı için,\n"
+        "daha sağlam 'Bileşen Bazlı Toplama' yöntemi kullanılmıştır.\n\n"
+        "Bu yöntem karışım etkileşimlerini ihmal eder ve CoolProp yerleşik\n"
+        "hesabına göre daha düşük doğrulukta olabilir.\n\n"
+        "Sonuçları mühendislik onayı ile kullanınız."
         )
 
 
@@ -85,8 +85,8 @@ def show_backend_fallback_info(error_message: str, failed_backend: str) -> None:
         failed_backend: Name of the backend that failed
     """
     messagebox.showwarning(
-        "Backend Değişikliği",
-        f"{failed_backend} backend'i başarısız oldu:\n\n"
+        "Yöntem Değişikliği",
+        f"{failed_backend} yöntemi başarısız oldu:\n\n"
         f"CoolProp Hatası: {error_message}\n\n"
         f"Program otomatik olarak alternatif bir yöntem deneyecek."
     )
@@ -102,7 +102,7 @@ def show_backend_used_info(requested_backend: str, used_backend: str) -> None:
     """
     if requested_backend != used_backend:
         messagebox.showinfo(
-            "Backend Değişikliği",
+            "Yöntem Değişikliği",
             f"Hesaplama {used_backend} yöntemi ile tamamlandı.\n"
             f"(İstenilen: {requested_backend})"
         )
@@ -112,10 +112,10 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.3 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.4.1 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.3 sürümü ile AGA8 (GERG-2008 ve AGA8-Detail) motorları ve gelişmiş yan yana yöntem karşılaştırma tablosu eklenmiştir.\n\n"
+        "v1.4.1 sürümü ile kod kalitesi iyileştirmeleri, hata yönetimi güçlendirmesi ve kapsamlı test altyapısı eklendi.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -152,34 +152,33 @@ def show_user_guide_dialog() -> None:
 
 
 def show_new_features_info() -> None:
-    """Show new features information for v1.3 with do not show again option."""
+    """Show new features information for v1.4 with do not show again option."""
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.3")
+    dialog.title("Yenilikler - Sürüm v1.4.1")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
-    # Make modal (optional, but good for focus)
     dialog.transient()
     dialog.grab_set()
     
-    # Content Frame
     frame = ctk.CTkFrame(dialog)
     frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
     
-    # Title
     ctk.CTkLabel(
         frame, 
-        text="🚀 NATURAL GAS PROP MAIN - YENİ SÜRÜM", 
+        text="🚀 DOĞAL GAZ PROP - YENİ SÜRÜM",
         font=ctk.CTkFont(size=14, weight="bold")
     ).pack(pady=(0, 20))
     
-    # Info Text
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.3):\n"
-        "• Z faktörü için Standing-Katz ANN10/ANN5 ve DAK karşılaştırması.\n"
-        "• CoolProp backendleri başarısız olursa geçerlilik uyarılı ANN10 Z-only fallback.\n"
-        "• AGA8 referans hesaplayıcısıyla doğrulanan Z karşılaştırmaları.\n\n"
+        "🌟 YENİ ÖZELLİKLER (v1.4.1):\n"
+        "• Kod temizliği: God method ayrıştırması, bare except temizliği, Pydantic v2 uyumu.\n"
+        "• Hata yönetimi: Sessiz except blokları loglamalı hale getirildi.\n"
+        "• Performans: PropsSI cache, pie chart throttle, Z-only fallback optimizasyonu.\n"
+        "• Güvenlik: Download URL GitHub-only doğrulaması.\n"
+        "• UI: Başarı popup kaldırıldı, buton state kurtarma, log filtresi Türkçeleştirildi.\n"
+        "• Test: 133 test (47 yeni: converters, Z ANN/DAK, heating values, AGA8, serializer).\n\n"
         "🌟 ÖNCEKİ ÖZELLİKLER (v1.1):\n"
         "• 📈 Faz Diyagramı: Karışımlarınız için çiğlenme/kaynama noktası eğrilerini görün.\n"
         "• 📄 Profesyonel PDF Raporu: Hesaplamalarınızı grafikler içeren şık PDF'lere dönüştürün.\n"
@@ -209,7 +208,7 @@ def show_new_features_info() -> None:
     # Close Logic
     def on_close():
         if dont_show_var.get():
-            preferences.set_preference("show_welcome_v1_0", False)
+            preferences.set_preference("show_welcome_dismissed_version", preferences.get_preference("show_welcome_dismissed_version", "v1.0"))
         dialog.destroy()
     
     # Button

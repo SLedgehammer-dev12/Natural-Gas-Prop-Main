@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Dict, List, Optional
+from functools import lru_cache
+from typing import Dict, List, Optional, Any
 
 from natural_gas_main.models.gas_data import GasMixture
 
@@ -37,6 +38,9 @@ class ZFactorEstimate:
 
 class StandingKatzZFactor:
     """ANN10/ANN5/DAK Z estimators based on pseudo-reduced properties."""
+
+    # Cache for pure-component critical properties (name -> (Tcrit, pcrit, M))
+    _props_cache: Dict[str, tuple] = {}
 
     PPR_MIN = 0.0
     PPR_MAX = 30.0
@@ -89,11 +93,11 @@ class StandingKatzZFactor:
     ]
     WB3_10 = [-30.1311, 2.0902, -3.5296, 18.1108, -2.528, -0.7228, 0.0186, 5.3507, -0.1476, -5.0827, 3.9767]
 
-    def __init__(self, coolprop_module):
+    def __init__(self, coolprop_module: Any):
         self.cp = coolprop_module
 
     def pseudo_critical(self, mixture: GasMixture) -> PseudoCriticalProperties:
-        """Calculate Kay-rule pseudo-critical properties."""
+        """Calculate Kay-rule pseudo-critical properties (cached per component)."""
         mole_fractions = self._mole_fractions(mixture)
         tpc = 0.0
         ppc = 0.0
@@ -101,9 +105,13 @@ class StandingKatzZFactor:
 
         for name, x in mole_fractions.items():
             cp_name = GasMixture._format_gas_name_for_coolprop(name)
-            tc = self.cp.PropsSI("Tcrit", cp_name)
-            pc = self.cp.PropsSI("pcrit", cp_name)
-            mw = self.cp.PropsSI("M", cp_name)
+            if cp_name not in self._props_cache:
+                self._props_cache[cp_name] = (
+                    self.cp.PropsSI("Tcrit", cp_name),
+                    self.cp.PropsSI("pcrit", cp_name),
+                    self.cp.PropsSI("M", cp_name),
+                )
+            tc, pc, mw = self._props_cache[cp_name]
             tpc += x * tc
             ppc += x * pc
             molar_mass += x * mw

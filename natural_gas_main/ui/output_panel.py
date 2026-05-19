@@ -133,9 +133,9 @@ class OutputPanel(ctk.CTkFrame):
         self.results_tree.heading("Değer", text="Değer")
         self.results_tree.heading("Birim", text="Birim")
         
-        self.results_tree.column("Özellik", width=250)
-        self.results_tree.column("Değer", width=170)
-        self.results_tree.column("Birim", width=120)
+        self.results_tree.column("Özellik", width=250, minwidth=120)
+        self.results_tree.column("Değer", width=170, minwidth=80)
+        self.results_tree.column("Birim", width=120, minwidth=60)
         
         # Scrollbar for results
         scrollbar = ttk.Scrollbar(
@@ -147,6 +147,9 @@ class OutputPanel(ctk.CTkFrame):
         
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.results_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Auto-resize columns on window resize
+        results_tab.bind("<Configure>", lambda e: self._auto_resize_columns())
         
         # --- SECONDARY TREEVIEW FOR COMPARISON ---
         comp_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
@@ -164,11 +167,11 @@ class OutputPanel(ctk.CTkFrame):
         for col in comp_cols:
             self.comp_tree.heading(col, text=col)
             if col == "Özellik":
-                self.comp_tree.column(col, width=150)
+                self.comp_tree.column(col, width=150, minwidth=100)
             elif col == "Birim":
-                self.comp_tree.column(col, width=60)
+                self.comp_tree.column(col, width=60, minwidth=40)
             else:
-                self.comp_tree.column(col, width=90)
+                self.comp_tree.column(col, width=90, minwidth=60)
                 
         comp_scrollbar = ttk.Scrollbar(
             results_tab,
@@ -224,6 +227,15 @@ class OutputPanel(ctk.CTkFrame):
         
         self.phase_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
+        # Responsive resize for phase diagram
+        def _on_phase_resize(event):
+            w = event.width / self.phase_fig.dpi
+            h = event.height / self.phase_fig.dpi
+            if w > 3.0 and h > 2.0:
+                self.phase_fig.set_size_inches(w, h)
+                self.phase_canvas.draw_idle()
+        phase_tab.bind("<Configure>", _on_phase_resize, "+")
+
         # ============== TAB 3: Loglar ==============
         self.notebook.add("Loglar")
         logs_tab = self.notebook.tab("Loglar")
@@ -234,11 +246,11 @@ class OutputPanel(ctk.CTkFrame):
         
         ctk.CTkLabel(filter_frame, text="Seviye:").pack(side=tk.LEFT, padx=(0, 5))
         
-        self.log_level_var = ctk.StringVar(value="Hepsi")
+        self.log_level_var = ctk.StringVar(value="Tümü")
         level_combo = ctk.CTkComboBox(
             filter_frame,
             variable=self.log_level_var,
-            values=["Hepsi", "DEBUG", "INFO", "WARNING", "ERROR"],
+            values=["Tümü", "DEBUG", "INFO", "UYARI", "HATA"],
             state="readonly",
             width=100,
             command=self._on_log_level_change
@@ -302,11 +314,11 @@ class OutputPanel(ctk.CTkFrame):
         
         # Level name to numeric mapping
         self.level_map = {
-            "Hepsi": 0,
+            "Tümü": 0,
             "DEBUG": logging.DEBUG,
             "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR
+            "UYARI": logging.WARNING,
+            "HATA": logging.ERROR
         }
         
         panel = self  # Reference for inner class
@@ -569,11 +581,47 @@ class OutputPanel(ctk.CTkFrame):
             results.append(tuple(values))
         return results
 
+    def _auto_resize_columns(self):
+        """Dynamically resize tree columns to fit available width."""
+        try:
+            avail = self.results_tree.winfo_width() - 20
+            if avail < 100:
+                return
+            self.results_tree.column("Özellik", width=int(avail * 0.46))
+            self.results_tree.column("Değer", width=int(avail * 0.31))
+            self.results_tree.column("Birim", width=int(avail * 0.23))
+
+            avail_c = self.comp_tree.winfo_width() - 20
+            if avail_c < 200:
+                return
+            self.comp_tree.column("Özellik", width=int(avail_c * 0.20))
+            self.comp_tree.column("Birim", width=int(avail_c * 0.09))
+            method_w = int(avail_c * 0.71 / 7)
+            for col in ("GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR", "Katz", "DAK"):
+                self.comp_tree.column(col, width=method_w)
+        except tk.TclError:
+            pass
+
+    def _update_theme_colors(self):
+        """Update phase envelope figure colours when appearance mode changes."""
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        bg_col = '#2b2b2b' if is_dark else '#f0f0f0'
+        fg_col = 'white' if is_dark else 'black'
+        self.phase_fig.patch.set_facecolor(bg_col)
+        self.phase_ax.set_facecolor(bg_col)
+        self.phase_ax.tick_params(colors=fg_col)
+        for spine in self.phase_ax.spines.values():
+            spine.set_edgecolor(fg_col)
+        self.phase_ax.xaxis.label.set_color(fg_col)
+        self.phase_ax.yaxis.label.set_color(fg_col)
+        self.phase_ax.title.set_color(fg_col)
+        self.phase_canvas.draw()
+
     def _plot_phase_envelope(self, phase_env_data: PhaseEnvelopeData, current_t: float, current_p: float):
         """Plot phase envelope data."""
         self.phase_ax.clear()
+        self._update_theme_colors()
         
-        # Determine colors based on theme
         is_dark = ctk.get_appearance_mode() == "Dark"
         text_color = 'white' if is_dark else 'black'
         grid_color = '#444444' if is_dark else '#dddddd'
@@ -599,7 +647,7 @@ class OutputPanel(ctk.CTkFrame):
         self.phase_ax.plot(op_t, op_p, 'g*', markersize=12, label='İşletme Noktası')
         
         # Setup graph details
-        self.phase_ax.set_title("Faz Diyagramı (Phase Envelope)", color=text_color, fontweight='bold')
+        self.phase_ax.set_title("Faz Diyagramı", color=text_color, fontweight='bold')
         self.phase_ax.set_xlabel("Sıcaklık (°C)", color=text_color)
         self.phase_ax.set_ylabel("Basınç (bar)", color=text_color)
         self.phase_ax.grid(True, linestyle='--', color=grid_color)

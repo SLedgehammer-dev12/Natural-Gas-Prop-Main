@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "natural-gas-prop-main"
+version = "1.4.1"
+description = "Termodinamik doğal gaz karışımı hesaplama uygulaması"
+readme = "README.md"
+license = { text = "Proprietary - Kompresör Pompa" }
+requires-python = ">=3.10"
+dependencies = [
+    "CoolProp>=6.4.1",
+    "pydantic>=2.0.0",
+    "customtkinter>=5.2.2",
+    "matplotlib>=3.10.0",
+    "fpdf2>=2.8.0",
+    "pyaga8>=0.1.16",
+]
+
+[tool.setuptools.packages.find]
+include = ["natural_gas_main", "natural_gas_main.*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=50"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+disallow_untyped_defs = false

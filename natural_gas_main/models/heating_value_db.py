@@ -29,10 +29,24 @@ REFERENCE_HEATING_VALUES: Dict[str, Tuple[float, float]] = {
     "n-Nonane": (48.19, 44.68),
     "n-Decane": (48.10, 44.60),
     
+    # Higher alkanes
+    "n-Undecane": (47.95, 44.48),
+    "n-Dodecane": (47.87, 44.41),
+    "Neopentane": (48.94, 45.24),
+    "Isohexane": (48.60, 45.05),
+    
     # Alkenes
     "Ethylene": (50.30, 47.16),
     "Propylene": (48.95, 45.78),
     "1-Butene": (48.45, 45.33),
+    "IsoButene": (48.38, 45.24),
+    "cis-2-Butene": (48.40, 45.26),
+    "trans-2-Butene": (48.35, 45.21),
+    
+    # Cyclic hydrocarbons
+    "CycloPropane": (49.95, 46.50),
+    "Cyclopentane": (47.50, 44.10),
+    "CycloHexane": (46.60, 43.50),
     
     # Aromatics
     "Benzene": (41.85, 40.17),
@@ -40,6 +54,9 @@ REFERENCE_HEATING_VALUES: Dict[str, Tuple[float, float]] = {
     
     # Other hydrocarbons
     "Acetylene": (49.91, 48.23),
+    
+    # Other combustibles
+    "Ammonia": (22.50, 18.60),
     
     # Non-combustible (zero heating value)
     "Nitrogen": (0.0, 0.0),

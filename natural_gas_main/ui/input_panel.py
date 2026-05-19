@@ -33,18 +33,20 @@ class InputPanel(ctk.CTkFrame):
     - Backend method selection
     """
     
-    def __init__(self, parent, gas_list: List[str], *args, **kwargs):
+    def __init__(self, parent, gas_list: List[str], on_change: Optional[callable] = None, *args, **kwargs):
         """
         Initialize input panel.
         
         Args:
             parent: Parent widget
             gas_list: List of available gas names
+            on_change: Optional callback when any input value changes
         """
         super().__init__(parent, *args, **kwargs)
         
         self.gas_list = gas_list
         self.logger = logging.getLogger(__name__)
+        self._on_change = on_change
         
         self.create_widgets()
     
@@ -193,18 +195,27 @@ class InputPanel(ctk.CTkFrame):
         # Third Panel: Pie Chart
         pie_frame = ctk.CTkFrame(paned, fg_color="transparent")
         paned.add(pie_frame, minsize=200)
-        
+
         self.pie_fig = Figure(figsize=(3, 3), dpi=80)
         self.pie_ax = self.pie_fig.add_subplot(111)
-        
+
         bg_col = '#2b2b2b' if ctk.get_appearance_mode() == "Dark" else '#f0f0f0'
         self.pie_fig.patch.set_facecolor(bg_col)
         self.pie_ax.set_facecolor(bg_col)
-        
+
         self.pie_canvas = FigureCanvasTkAgg(self.pie_fig, master=pie_frame)
         self.pie_canvas.draw()
         self.pie_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
+
+        # Responsive resize: keep the figure tightly wrapped inside its frame
+        def _on_pie_resize(event):
+            w = event.width / self.pie_fig.dpi
+            h = event.height / self.pie_fig.dpi
+            if w > 1.0 and h > 1.0:
+                self.pie_fig.set_size_inches(w, h)
+                self.pie_canvas.draw_idle()
+        pie_frame.bind("<Configure>", _on_pie_resize, "+")
+
         # Initial draw
         self._update_pie_chart()
 
@@ -258,6 +269,7 @@ class InputPanel(ctk.CTkFrame):
         ctk.CTkLabel(inputs_frame, text="Sıcaklık:").grid(row=0, column=0, sticky="w", padx=(0, 5))
         
         self.temp_var = tk.DoubleVar(value=15.0)
+        self.temp_var.trace_add("write", lambda *a: self._on_change() if self._on_change else None)
         ctk.CTkEntry(inputs_frame, textvariable=self.temp_var, width=80).grid(row=0, column=1, padx=(0, 5))
         
         self.temp_unit_var = ctk.StringVar(value="°C")
@@ -274,6 +286,7 @@ class InputPanel(ctk.CTkFrame):
         ctk.CTkLabel(inputs_frame, text="Basınç:").grid(row=0, column=3, sticky="w", padx=(0, 5))
         
         self.press_var = tk.DoubleVar(value=1.01325)
+        self.press_var.trace_add("write", lambda *a: self._on_change() if self._on_change else None)
         ctk.CTkEntry(inputs_frame, textvariable=self.press_var, width=80).grid(row=0, column=4, padx=(0, 5))
         
         self.press_unit_var = ctk.StringVar(value="bar(a)")
@@ -458,9 +471,19 @@ class InputPanel(ctk.CTkFrame):
             self.total_label.configure(text_color="#4CAF50") # Green
             
         self._update_pie_chart()
+        if self._on_change:
+            self._on_change()
             
     def _update_pie_chart(self):
-        """Update pie chart representation of gas mixture."""
+        """Update pie chart representation of gas mixture (auto-throttled)."""
+        if self._pie_chart_scheduled is not None:
+            return
+        self._pie_chart_scheduled = self.after(60, self._draw_pie_chart)
+
+    _pie_chart_scheduled = None
+
+    def _draw_pie_chart(self):
+        self._pie_chart_scheduled = None
         self.pie_ax.clear()
         labels = []
         sizes = []

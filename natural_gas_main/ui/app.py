@@ -62,11 +62,7 @@ class ThermoApp(ctk.CTk):
         
         # Load gas list
         self.gas_list = self._load_gas_list()
-        
-        # Apply theme (Remove old ttk style)
-        # style = ttk.Style(self)
-        # style.theme_use(config.UI_THEME)
-        
+
         # Initialize calculator
         self.calculator = ThermoCalculator()
         
@@ -118,11 +114,11 @@ class ThermoApp(ctk.CTk):
         
         # Fallback list
         self.logger.warning("Using fallback gas list")
-        messagebox.showwarning(
+        self.after(50, lambda: messagebox.showwarning(
             "CoolProp Uyarısı",
             "CoolProp akışkan listesi yüklenemedi.\n"
             "Kısıtlı yedek akışkan listesi kullanılıyor."
-        )
+        ))
         return config.FALLBACK_GAS_LIST
     
     def _create_menu(self):
@@ -191,7 +187,7 @@ class ThermoApp(ctk.CTk):
         input_frame = ctk.CTkFrame(self.main_paned)
         self.main_paned.add(input_frame, minsize=430, stretch="never")
         
-        self.input_panel = InputPanel(input_frame, self.gas_list)
+        self.input_panel = InputPanel(input_frame, self.gas_list, on_change=self._on_input_changed)
         self.input_panel.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Calculate button frame with progress
@@ -262,7 +258,7 @@ class ThermoApp(ctk.CTk):
     
     def _show_welcome(self):
         """Show welcome/new features message if not disabled."""
-        should_show = preferences.get_preference("show_welcome_v1_0", default=True)
+        should_show = preferences.get_preference("show_welcome_dismissed_version", "v1.0") != config.APP_VERSION
         if should_show:
             dialogs.show_new_features_info()
 
@@ -277,7 +273,8 @@ class ThermoApp(ctk.CTk):
         preferences.set_preference("ctk_appearance_mode", new_mode)
         # Update plots and other theme-dependent elements
         if hasattr(self, 'output_panel'):
-            self.output_panel._on_unit_change() # Triggers re-plotting with correct theme colors
+            self.output_panel._update_theme_colors()
+            self.output_panel._on_unit_change()
             
     def _change_color_theme(self, new_theme: str):
         """Change application color theme (Requires restart for full effect usually, but let's try)."""
@@ -290,56 +287,35 @@ class ThermoApp(ctk.CTk):
     
     # Event handlers
     
+    def _on_input_changed(self):
+        """Reset button from error state when user modifies any input."""
+        if self.calc_button.cget("text") == "Hata! Tekrar Dene":
+            self.calc_button.configure(fg_color="#4CAF50", text="Hesapla")
+    
     def _on_calculate(self):
         """Handle calculate button click."""
-        # Validate inputs
         try:
+            # Validate and get all inputs in one call
             inputs = self.input_panel.get_all_inputs()
-        except ValidationError as e:
-            dialogs.show_error("Giriş Hatası", str(e))
-            return
-        except Exception as e:
-            self.logger.error(f"Input validation error: {e}", exc_info=True)
-            dialogs.show_error("Giriş Hatası", f"Beklenmeyen hata: {str(e)}")
-            return
-        
-        # Check HEOS compatibility
-        try:
-            # Get inputs
-            mixture = self.input_panel.get_mixture()
-            temp_k = self.input_panel.get_temperature_k()
-            press_pa = self.input_panel.get_pressure_pa()
-            vol_m3 = self.input_panel.get_volume_m3()
-            backend = self.input_panel.get_backend()
-            
-            # Get standard conditions
             std_T, std_P, std_name = self.input_panel.get_standard_conditions()
-            
-            # Package inputs
-            inputs = {
-                "mixture": mixture,
-                "temp_k": temp_k,
-                "press_pa": press_pa,
-                "vol_m3": vol_m3,
-                "backend": backend,
+
+            # Augment with display strings and standard conditions
+            inputs.update({
                 "standard_T": std_T,
                 "standard_P": std_P,
                 "standard_name": std_name,
                 "temperature_display": f"{self.input_panel.temp_var.get()} {self.input_panel.temp_unit_var.get()}",
                 "pressure_display": f"{self.input_panel.press_var.get()} {self.input_panel.press_unit_var.get()}",
-                "volume_display": (
-                    f"{self.input_panel.volume_entry.get().strip()} {self.input_panel.vol_unit_var.get()}"
-                    if self.input_panel.volume_entry.get().strip()
-                    else None
-                )
-            }
-            
+            })
+            vol_str = self.input_panel.volume_entry.get().strip()
+            inputs["volume_display"] = f"{vol_str} {self.input_panel.vol_unit_var.get()}" if vol_str else None
+
             # Show progress
             self.status_var.set("Hesaplanıyor...")
             self.calc_button.configure(state="disabled", fg_color="#FFA500", text="Hesaplanıyor...")
             self.calc_progress.pack(fill=tk.X, pady=(5, 0))
             self.calc_progress.start()
-            
+
             # Run in thread
             thread = threading.Thread(
                 target=self._run_calculation,
@@ -347,12 +323,17 @@ class ThermoApp(ctk.CTk):
                 daemon=True
             )
             thread.start()
-            
+
+        except ValidationError as e:
+            dialogs.show_error("Giriş Hatası", str(e))
+            self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
         except ThermoCalculationError as e:
             messagebox.showerror("Giriş Hatası", str(e))
+            self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
         except Exception as e:
             messagebox.showerror("Hata", f"Beklenmeyen hata: {e}")
             logging.error(f"Input processing failed: {e}", exc_info=True)
+            self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
 
     def _check_queue(self):
         """Check queue for calculation results."""
@@ -380,9 +361,9 @@ class ThermoApp(ctk.CTk):
         try:
             # Extract inputs
             mixture = inputs["mixture"]
-            temp_k = inputs["temp_k"]
-            press_pa = inputs["press_pa"]
-            vol_m3 = inputs["vol_m3"]
+            temp_k = inputs["temperature_k"]
+            press_pa = inputs["pressure_pa"]
+            vol_m3 = inputs.get("volume_m3")
             
             # Calculate with backend fallback. HEOS can fail for some valid
             # natural-gas-like mixtures when binary interaction data is missing.
@@ -397,11 +378,6 @@ class ThermoApp(ctk.CTk):
                 standard_name=inputs.get("standard_name")
             )
 
-            if result is None:
-                raise ThermoCalculationError(
-                    "Hesaplama HEOS, SRK ve PR yÃ¶ntemleriyle tamamlanamadÄ±."
-                )
-            
             # Send success to queue
             self.result_queue.put(("success", (result, used_backend, inputs)))
             
@@ -446,9 +422,6 @@ class ThermoApp(ctk.CTk):
         self.calc_progress.stop()
         self.calc_progress.pack_forget()
         self.calc_button.configure(state="normal", fg_color="#4CAF50", text="Hesapla")
-        
-        # Success notification
-        messagebox.showinfo("Hesaplama Tamamlandı", "Sonuçlar başarıyla hesaplandı!")
     
     def _on_calculation_error(self, error: Exception):
         """
@@ -649,15 +622,15 @@ class ThermoApp(ctk.CTk):
             self.status_var.set("Güncellemeler kontrol ediliyor...")
             self.configure(cursor="watch")
             self.update();
-            
+
             checker = UpdateChecker()
-            has_update, update_info = checker.check_for_updates()
-            
+            has_update, update_info, status_msg = checker.check_for_updates()
+
             self.configure(cursor="")
-            
-            if has_update:
+
+            if has_update and update_info:
                 msg = (
-                    f"✨ YENİ SÜRÜM MEVCUT!\n\n"
+                    f"✨ YENI SÜRÜM MEVCUT!\n\n"
                     f"Versiyon: {update_info.get('version')}\n"
                     f"Tarih: {update_info.get('date')}\n\n"
                     f"Değişiklikler:\n{update_info.get('changelog', '-')}\n\n"
@@ -665,17 +638,14 @@ class ThermoApp(ctk.CTk):
                 )
                 if messagebox.askyesno("Güncelleme Mevcut", msg):
                     checker.open_download_page(update_info.get('download_url'))
+                self.status_var.set("Hazır.")
+            elif status_msg:
+                messagebox.showinfo("Güncelleme", status_msg)
+                self.status_var.set(status_msg)
             else:
-                messagebox.showinfo(
-                    "Güncel",
-                    f"Programınız güncel.\n"
-                    f"Versiyon: {config.APP_VERSION}"
-                )
-                
-            self.status_var.set("Hazır.")
-            
+                self.status_var.set("Hazır.")
+
         except Exception as e:
             self.configure(cursor="")
             self.logger.error(f"Manual update check failed: {e}")
-            messagebox.showerror("Hata", f"Güncelleme kontrolü başarısız:\n{e}")
             self.status_var.set("Güncelleme kontrolü başarısız.")

@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.3",
-  "date": "2026-05-09",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.3",
-  "changelog": "- GERG-2008 ve AGA8-Detail (pyaga8) hesaplama motorlari entegre edildi.\n- Daha genis kapsamli Z-Faktoru ve hesaplama yontemi karsilastirma tablolari eklendi.\n- Desteklenmeyen karisimlarda CoolProp HEOS/SRK ya otomatik akilli gecis saglandi."
+  "version": "v1.4.1",
+  "date": "2026-05-18",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.4.1",
+  "changelog": "- Kod temizligi: God method ayrismasi, bare except temizligi, Pydantic v2 uyumu.\n- Hata yonetimi: Sessiz except bloklari loglamali hale getirildi.\n- Performans: PropsSI cache, pie chart throttle, Z-only fallback optimizasyonu.\n- Guvenlik: Download URL GitHub-only dogrulamasi.\n- UI: Basari popup kaldirildi, buton state kurtarma, log filtresi Turkcelestirildi.\n- Test: 133 test (47 yeni: converters, Z ANN/DAK, heating values, AGA8, serializer).\n- Preferences: AppData altina tasindi.\n- Version: __init__.py artik config.APP_VERSION'dan okuyor."
 }

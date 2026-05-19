@@ -45,10 +45,7 @@ class GasComponent(BaseModel):
         """Convert percentage to decimal (0-1 range)."""
         return self.fraction / 100.0
     
-    model_config = {
-        "frozen": False,  # Allow modification
-        "validate_assignment": True  # Validate on assignment
-    }
+    model_config = {"frozen": False, "validate_assignment": True}
 
 
 class GasMixture(BaseModel):
@@ -227,7 +224,4 @@ class GasMixture(BaseModel):
         ]
         return incompatible
     
-    model_config = {
-        "frozen": False,
-        "validate_assignment": True
-    }
+    model_config = {"frozen": False, "validate_assignment": True}

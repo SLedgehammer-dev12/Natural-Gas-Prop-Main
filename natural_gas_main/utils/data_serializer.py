@@ -74,10 +74,12 @@ def load_inputs_from_file(filepath: str) -> Dict[str, Any]:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Validate schema version
-        version = data.get("version", "0.0")
-        if not version.startswith("1."):
-            logger.warning(f"Unknown file version: {version}")
+        # Validate schema version (major must match, minor can differ)
+        file_version = data.get("version", "0.0")
+        file_major = file_version.split(".")[0]
+        our_major = SCHEMA_VERSION.split(".")[0]
+        if file_major != our_major:
+            logger.warning(f"Schema version mismatch: file={file_version}, app={SCHEMA_VERSION}")
         
         logger.info(f"Data loaded from {filepath}")
         return data

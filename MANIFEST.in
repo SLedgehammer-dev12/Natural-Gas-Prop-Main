@@ -1,0 +1,2 @@
+include tests/fixtures/*.ngp
+recursive-include tests *.py

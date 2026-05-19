@@ -49,3 +49,12 @@ Thumbs.db
 # Project specific
 *.txt.bak
 reports/
+user_preferences.json
+archive/
+
+# Coverage
+coverage.xml
+.coverage.*
+
+# Log rotation backups
+*.log.*

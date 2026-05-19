@@ -22,44 +22,50 @@ class UpdateChecker:
         self.current_version = config.APP_VERSION
         self.update_url = config.UPDATE_CHECK_URL
     
-    def check_for_updates(self) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    def check_for_updates(self) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         """
         Check if a new version is available.
-        
+
         Returns:
-            Tuple of (is_update_available, update_info_dict)
+            Tuple of (is_update_available, update_info_dict, status_message).
+            status_message is None on success, or an error description on failure.
         """
         try:
             self.logger.info(f"Checking for updates from: {self.update_url}")
-            
-            # Fetch version file with short timeout
+
             with urllib.request.urlopen(self.update_url, timeout=5) as response:
                 if response.status != 200:
-                    self.logger.warning(f"Update check failed with status: {response.status}")
-                    return False, None
-                
-                data = json.loads(response.read().decode('utf-8'))
-                
-                remote_version = data.get('version')
+                    msg = f"Sunucu yanıtı: {response.status}"
+                    self.logger.warning(f"Update check failed: {msg}")
+                    return False, None, msg
+
+                data = json.loads(response.read().decode("utf-8"))
+                remote_version = data.get("version")
                 if not remote_version:
-                    return False, None
-                
-                # Compare versions using packaging.version
+                    return False, None, "Sürüm bilgisi okunamadı."
+
                 if version.parse(remote_version) > version.parse(self.current_version):
-                    self.logger.info(f"New version found: {remote_version} (Current: {self.current_version})")
-                    return True, data
-                
+                    self.logger.info(
+                        f"New version found: {remote_version} (Current: {self.current_version})"
+                    )
+                    return True, data, None
+
                 self.logger.info("Application is up to date")
-                return False, None
-                
+                return False, None, "Program güncel."
+
         except urllib.error.URLError as e:
+            msg = "İnternet bağlantısı yok veya sunucuya erişilemiyor."
             self.logger.warning(f"Network error checking updates: {e}")
-            return False, None
+            return False, None, msg
         except Exception as e:
-            self.logger.error(f"Update check failed: {e}", exc_info=True)
-            return False, None
+            msg = f"Güncelleme kontrolü başarısız: {e}"
+            self.logger.error(msg, exc_info=True)
+            return False, None, msg
 
     def open_download_page(self, url: str = None):
-        """Open the download/repo page in browser."""
+        """Open the download/repo page in browser (only allows GitHub URLs)."""
         target_url = url or config.REPO_URL
+        if target_url and not target_url.startswith("https://github.com/"):
+            self.logger.warning(f"Blocked non-GitHub URL: {target_url}")
+            target_url = config.REPO_URL
         webbrowser.open(target_url)

@@ -5,7 +5,7 @@ Centralizes all constants, limits, and configurable parameters.
 """
 
 from typing import List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class AppConfig(BaseModel):
@@ -54,18 +54,6 @@ class AppConfig(BaseModel):
         description="Predefined standard conditions"
     )
     
-    # Predefined Standards
-    AVAILABLE_STANDARDS: Dict[str, Dict[str, float]] = Field(
-        default={
-            "ISO 13443": {"temp_k": 288.15, "press_pa": 101325.0, "desc": "15°C, 1 atm"},
-            "GPA 2172": {"temp_k": 288.706, "press_pa": 101325.0, "desc": "60°F, 14.696 psi"},
-            "GOST 2939": {"temp_k": 293.15, "press_pa": 101325.0, "desc": "20°C, 1 atm"},
-            "NTP (Normal)": {"temp_k": 273.15, "press_pa": 101325.0, "desc": "0°C, 1 atm"},
-            "SATP": {"temp_k": 298.15, "press_pa": 100000.0, "desc": "25°C, 1 bar"},
-        },
-        description="Available standard conditions"
-    )
-    
     # Calculation Limits
     MAX_COMPONENTS: int = Field(
         default=20,
@@ -108,7 +96,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.3 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.4.1 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -207,7 +195,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.3",
+        default="v1.4.1",
         description="Current application version"
     )
     REPO_USER: str = Field(
@@ -233,10 +221,7 @@ class AppConfig(BaseModel):
         """Get main repository URL."""
         return f"https://github.com/{self.REPO_USER}/{self.REPO_NAME}/tree/{self.BRANCH_NAME}"
 
-    class Config:
-        """Pydantic configuration."""
-        validate_assignment = True
-        frozen = False  # Allow runtime modifications if needed
+    model_config = ConfigDict(validate_assignment=True, frozen=False)
 
 
 # Global configuration instance
