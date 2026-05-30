@@ -58,3 +58,5 @@ coverage.xml
 
 # Log rotation backups
 *.log.*
+dist_debug/
+dist_debug2/
