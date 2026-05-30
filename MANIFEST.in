@@ -1,2 +1,15 @@
+graft natural_gas_main
+include run_app.py
+include version.json
+include version_info.txt
+include README.md
+include THIRD_PARTY_NOTICES.md
+include pyproject.toml
+include requirements.txt
+include requirements-dev.txt
 include tests/fixtures/*.ngp
 recursive-include tests *.py
+recursive-include patches *.py
+prune __pycache__
+prune .mypy_cache
+prune .pytest_cache

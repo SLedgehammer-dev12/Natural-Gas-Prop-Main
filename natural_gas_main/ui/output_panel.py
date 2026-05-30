@@ -8,6 +8,8 @@ import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
 from typing import List, Tuple, Optional
+from threading import Lock
+from collections import deque
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -309,8 +311,8 @@ class OutputPanel(ctk.CTkFrame):
         """Setup custom logging handler to capture logs to Text widget."""
         import logging
         
-        # Store all log records for filtering
-        self.log_records = []
+        self.log_records = deque(maxlen=2000)
+        self._log_lock = Lock()
         
         # Level name to numeric mapping
         self.level_map = {
@@ -333,8 +335,8 @@ class OutputPanel(ctk.CTkFrame):
                 msg = self.format(record)
                 level = record.levelname
                 
-                # Store record for filtering
-                panel.log_records.append((msg, level, record.levelno))
+                with panel._log_lock:
+                    panel.log_records.append((msg, level, record.levelno))
                 
                 # Check if should display based on current filter
                 selected_level = panel.log_level_var.get()
@@ -375,7 +377,7 @@ class OutputPanel(ctk.CTkFrame):
         self.log_text.configure(state=tk.NORMAL)
         self.log_text.delete(1.0, tk.END)
         
-        for msg, level, levelno in self.log_records:
+        for msg, level, levelno in list(self.log_records):
             if levelno >= min_level:
                 self.log_text.insert(tk.END, msg + '\n', level)
         
@@ -388,6 +390,8 @@ class OutputPanel(ctk.CTkFrame):
         """Clear log text widget."""
         self.log_text.configure(state=tk.NORMAL)
         self.log_text.delete(1.0, tk.END)
+        with self._log_lock:
+            self.log_records.clear()
         self.log_text.configure(state=tk.DISABLED)
     
     def display_results(self, result: CalculationResult) -> None:

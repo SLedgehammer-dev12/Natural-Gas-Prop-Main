@@ -78,6 +78,8 @@ def calculate_aga8(
     comp = pyaga8.Composition()
 
     sum_fractions = 0.0
+    mapped_count = 0
+    unmapped_gases = []
     for gas in mixture.components:
         coolprop_name = mixture._format_gas_name_for_coolprop(gas.name).lower()
         aga8_name = AGA8_MAPPING.get(coolprop_name)
@@ -85,15 +87,24 @@ def calculate_aga8(
             val = gas.fraction / 100.0
             setattr(comp, aga8_name, val)
             sum_fractions += val
+            mapped_count += 1
         else:
+            unmapped_gases.append(gas.name)
             logger.warning(
                 f"Bileşen {gas.name} AGA8 standardında desteklenmiyor. Yoksayılıyor."
             )
 
-    if sum_fractions < 0.99:
+    if sum_fractions < 0.95:
         raise ValueError(
-            f"AGA8 için geçerli gazların toplamı {sum_fractions} (< 0.99). "
-            "AGA8 desteklenmiyor."
+            f"AGA8 için geçerli gazların toplamı {sum_fractions} (< 0.95). "
+            f"Atlanan bileşenler: {', '.join(unmapped_gases)}. AGA8 kullanılamaz."
+        )
+
+    if unmapped_gases and sum_fractions < 0.99:
+        logger.warning(
+            f"AGA8 bileşenlerinin toplamı {sum_fractions}. "
+            f"AGA8'de tanınmayan bileşenler ({', '.join(unmapped_gases)}) "
+            f"normalize ediliyor. Sonuçlarda sapma olabilir!"
         )
 
     if abs(sum_fractions - 1.0) > 1e-5:

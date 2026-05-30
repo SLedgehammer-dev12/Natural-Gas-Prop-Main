@@ -47,6 +47,7 @@ class InputPanel(ctk.CTkFrame):
         self.gas_list = gas_list
         self.logger = logging.getLogger(__name__)
         self._on_change = on_change
+        self._pie_chart_scheduled = None
         
         self.create_widgets()
     
@@ -479,8 +480,6 @@ class InputPanel(ctk.CTkFrame):
         if self._pie_chart_scheduled is not None:
             return
         self._pie_chart_scheduled = self.after(60, self._draw_pie_chart)
-
-    _pie_chart_scheduled = None
 
     def _draw_pie_chart(self):
         self._pie_chart_scheduled = None

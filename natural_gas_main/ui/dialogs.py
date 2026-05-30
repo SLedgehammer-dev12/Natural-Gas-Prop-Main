@@ -112,10 +112,11 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.4.1 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.5.0 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.4.1 sürümü ile kod kalitesi iyileştirmeleri, hata yönetimi güçlendirmesi ve kapsamlı test altyapısı eklendi.\n\n"
+        "v1.5.0 sürümü: Wichert-Aziz asit gaz düzeltmesi, ISO 6976:2016,\n"
+        "Sutton korelasyonu, kritik düzeltmeler ve 278 test.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -155,7 +156,7 @@ def show_new_features_info() -> None:
     """Show new features information for v1.4 with do not show again option."""
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.4.1")
+    dialog.title("Yenilikler - Sürüm v1.5.0")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
@@ -172,24 +173,25 @@ def show_new_features_info() -> None:
     ).pack(pady=(0, 20))
     
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.4.1):\n"
-        "• Kod temizliği: God method ayrıştırması, bare except temizliği, Pydantic v2 uyumu.\n"
-        "• Hata yönetimi: Sessiz except blokları loglamalı hale getirildi.\n"
-        "• Performans: PropsSI cache, pie chart throttle, Z-only fallback optimizasyonu.\n"
-        "• Güvenlik: Download URL GitHub-only doğrulaması.\n"
-        "• UI: Başarı popup kaldırıldı, buton state kurtarma, log filtresi Türkçeleştirildi.\n"
-        "• Test: 133 test (47 yeni: converters, Z ANN/DAK, heating values, AGA8, serializer).\n\n"
+        "🌟 YENİ ÖZELLİKLER (v1.5.0):\n"
+        "• Wichert-Aziz Düzeltmesi: Asit gaz (H₂S/CO₂) için doğru Z-faktörü hesabı.\n"
+        "• ISO 6976:2016 Modülü: Uluslararası standart uyumlu ısıl değer hesaplama.\n"
+        "• Sutton(1985) Korelasyonu: SG'den pseudo-kritik özellik tahmini.\n"
+        "• Faz Diyagramı Kritik Nokta: Gelişmiş faz zarfı analizi.\n"
+        "• PDF Raporlama: macOS ve Linux için font desteği.\n"
+        "• Performans: Hızlı tercih okuma, bellek optimizasyonu.\n"
+        "• Hata Düzeltmeleri: Isıl değer, AGA8, standart koşullar.\n\n"
+        "🌟 ÖNCEKİ ÖZELLİKLER (v1.4.1):\n"
+        "• Kod temizliği: God method ayrıştırması, Pydantic v2 uyumu.\n"
+        "• Performans: PropsSI cache, pie chart throttle.\n"
+        "• Security: Download URL GitHub-only doğrulaması.\n"
+        "• 133 test, güçlendirilmiş hata yönetimi.\n\n"
         "🌟 ÖNCEKİ ÖZELLİKLER (v1.1):\n"
-        "• 📈 Faz Diyagramı: Karışımlarınız için çiğlenme/kaynama noktası eğrilerini görün.\n"
-        "• 📄 Profesyonel PDF Raporu: Hesaplamalarınızı grafikler içeren şık PDF'lere dönüştürün.\n"
-        "• 🥧 Bileşen Pasta Grafiği: Gaz kompozisyonunu görsel olarak anlık takip edin.\n"
-        "• 🎨 Çoklu Tema Desteği: Mavi, Yeşil ve Koyu-Mavi tema seçenekleri eklendi.\n"
-        "• ⚡ Akıllı Filtreleme: 100+ gaz arasından sadece yaygın doğal gazları görün.\n"
-        "• 📋 Hazır Şablonlar: Botaş, LNG gibi sık kullanılan gaz karışımlarını tek tıkla yükleyin.\n\n"
+        "• Faz Diyagramı, Profesyonel PDF Raporu, Pasta Grafiği.\n"
+        "• Çoklu Tema Desteği, Akıllı Filtreleme, Hazır Şablonlar.\n\n"
         "🎉 ÖNCEKİ ÖZELLİKLER (v1.0):\n"
         "• Modüler Mimari ve Modern CustomTkinter Arayüzü.\n"
-        "• KPI Panosu ile en kritik değerlere hızlı bakış.\n"
-        "• Thread-Safe güvenli hesaplama yapısı."
+        "• KPI Panosu, Thread-Safe hesaplama yapısı."
     )
     
     text_area = ctk.CTkTextbox(frame, wrap=tk.WORD, height=250, width=540, font=ctk.CTkFont(size=12))
@@ -208,7 +210,7 @@ def show_new_features_info() -> None:
     # Close Logic
     def on_close():
         if dont_show_var.get():
-            preferences.set_preference("show_welcome_dismissed_version", preferences.get_preference("show_welcome_dismissed_version", "v1.0"))
+            preferences.set_preference("show_welcome_dismissed_version", config.APP_VERSION)
         dialog.destroy()
     
     # Button

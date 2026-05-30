@@ -9,8 +9,16 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/'), ('natural_gas_main', 'natural_gas_main/')],
-    hiddenimports=[],
+    datas=[(str(customtkinter_path), 'customtkinter/')],
+    hiddenimports=[
+        'CoolProp.CoolProp',
+        'matplotlib.backends.backend_tkagg',
+        'PIL',
+        'fpdf',
+        'pyaga8',
+        'customtkinter',
+        'packaging',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -40,4 +48,19 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+app = BUNDLE(
+    exe,
+    name='Natural Gas Prop Main.app',
+    icon=None,
+    bundle_identifier='com.kompresorpompa.naturalgasprop',
+    info_plist={
+        'NSHighResolutionCapable': True,
+        'CFBundleShortVersionString': '1.5.0',
+        'CFBundleVersion': '1.5.0.0',
+        'CFBundleName': 'Natural Gas Prop Main',
+        'CFBundleDisplayName': 'Natural Gas Prop Main',
+        'LSMinimumSystemVersion': '10.15',
+    },
 )

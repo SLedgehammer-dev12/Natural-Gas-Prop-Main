@@ -9,6 +9,7 @@ import math
 from pydantic import BaseModel, Field
 
 from natural_gas_main.utils.result_unit_converter import ResultUnitConverter, UnitSystem
+from natural_gas_main.core.converters import convert_temperature_from_K, convert_pressure_from_Pa
 
 
 class ActualConditionResults(BaseModel):
@@ -41,8 +42,8 @@ class StandardConditionResults(BaseModel):
         standard_name: Name of the standard used
     """
     
-    density_std: float = Field(..., description="Density at standard conditions (kg/Sm³)")
-    specific_gravity: float = Field(..., description="Specific gravity relative to air (dimensionless)")
+    density_std: Optional[float] = Field(None, description="Density at standard conditions (kg/Sm³)")
+    specific_gravity: Optional[float] = Field(None, description="Specific gravity relative to air (dimensionless)")
     
     # Metadata about the standard used
     reference_temperature: float = Field(..., description="Reference temperature used (K)")
@@ -113,6 +114,29 @@ class ZFactorComparison(BaseModel):
     model_config = {"frozen": False}
 
 
+class HydrateResults(BaseModel):
+    """Hydrate analysis results and predictions."""
+    specific_gravity: float = Field(..., description="Gas specific gravity (dimensionless)")
+    operating_temperature: float = Field(..., description="Operating temperature (K)")
+    operating_pressure: float = Field(..., description="Operating pressure (Pa)")
+    
+    # Predicted hydrate formation temperatures in Kelvin
+    t_hydrate_hammerschmidt: float = Field(..., description="Hammerschmidt predicted temperature (K)")
+    t_hydrate_motiee: float = Field(..., description="Motiee predicted temperature (K)")
+    t_hydrate_towler_mokhatab: float = Field(..., description="Towler-Mokhatab predicted temperature (K)")
+    
+    # Average of the three predictions
+    t_hydrate_average: float = Field(..., description="Average predicted temperature (K)")
+    
+    # Hydrate formation risk assessment
+    risk_hammerschmidt: bool = Field(..., description="Risk of hydrate formation using Hammerschmidt")
+    risk_motiee: bool = Field(..., description="Risk of hydrate formation using Motiee")
+    risk_towler_mokhatab: bool = Field(..., description="Risk of hydrate formation using Towler-Mokhatab")
+    risk_average: bool = Field(..., description="Risk of hydrate formation based on average temperature")
+    
+    model_config = {"frozen": False}
+
+
 class CalculationResult(BaseModel):
     """
     Complete calculation results container.
@@ -128,6 +152,7 @@ class CalculationResult(BaseModel):
     phase_envelope: Optional[PhaseEnvelopeData] = Field(None, description="Phase envelope data for plotting")
     z_factor_comparison: List[ZFactorComparison] = Field(default_factory=list, description="Standing-Katz/DAK Z estimates")
     z_fallback_warning: Optional[str] = Field(None, description="Warning if result is Z-only fallback")
+    hydrate: Optional[HydrateResults] = Field(None, description="Hydrate analysis results")
     
     def to_display_list(self, unit_system: str = "SI") -> List[Tuple[str, str, str]]:
         """
@@ -201,15 +226,23 @@ class CalculationResult(BaseModel):
             results.append(("Ses Hızı (a)", "Hesaplanamadı", "-"))
         
         # Header - Standard Conditions
-        results.append(("- STANDART ÇEVRİM BİLGİLERİ (SCM @ 15°C, 101.325 kPa) -", "", ""))
-        results.append(("Standart Koşullar", "288.15 K, 101.325 kPa", "-"))
+        std_t_k = self.standard.reference_temperature
+        std_p_pa = self.standard.reference_pressure
+        results.append(("- STANDART ÇEVRİM BİLGİLERİ -", "", ""))
+        results.append(("Standart Koşullar", f"{std_t_k:.2f} K, {std_p_pa:.3f} kPa", "-"))
         
         # Standard density
-        std_density_val, std_density_unit = ResultUnitConverter.convert_density(
-            self.standard.density_std, prefs['density']
-        )
-        results.append(("Yoğunluk (SCM - ρ_std)", f"{std_density_val:.4f}", std_density_unit.replace('m³', 'Sm³') if 'm³' in std_density_unit else std_density_unit))
-        results.append(("Bağıl Yoğunluk (SG - Hava=1)", f"{self.standard.specific_gravity:.4f}", "-"))
+        if self.standard.density_std is not None:
+            std_density_val, std_density_unit = ResultUnitConverter.convert_density(
+                self.standard.density_std, prefs['density']
+            )
+            results.append(("Yoğunluk (SCM - ρ_std)", f"{std_density_val:.4f}", std_density_unit.replace('m³', 'Sm³') if 'm³' in std_density_unit else std_density_unit))
+        else:
+            results.append(("Yoğunluk (SCM - ρ_std)", "Hesaplanamadı", "-"))
+        if self.standard.specific_gravity is not None:
+            results.append(("Bağıl Yoğunluk (SG - Hava=1)", f"{self.standard.specific_gravity:.4f}", "-"))
+        else:
+            results.append(("Bağıl Yoğunluk (SG - Hava=1)", "Hesaplanamadı", "-"))
         
         # Header - Heating Values
         if self.heating:
@@ -286,6 +319,45 @@ class CalculationResult(BaseModel):
             elif self.volume_conversion.normal_volume_error:
                 results.append(("Normal Hacim (NCM)", "Hesaplanamadı", "-"))
                 results.append(("Hata Detayı", self.volume_conversion.normal_volume_error, ""))
+        
+        # Hydrate Analysis
+        if self.hydrate:
+            results.append(("- HİDRAT OLUŞUM ANALİZİ -", "", ""))
+            
+            # Decide units based on unit system
+            if unit_sys == UnitSystem.IMPERIAL:
+                t_unit = "°F"
+                p_unit = "psi(a)"
+            else:
+                t_unit = "°C"
+                p_unit = "bar(a)"
+                
+            # Convert values
+            op_temp_disp = convert_temperature_from_K(self.hydrate.operating_temperature, t_unit)
+            op_pres_disp = convert_pressure_from_Pa(self.hydrate.operating_pressure, p_unit)
+            
+            t_hamm_disp = convert_temperature_from_K(self.hydrate.t_hydrate_hammerschmidt, t_unit)
+            t_mot_disp = convert_temperature_from_K(self.hydrate.t_hydrate_motiee, t_unit)
+            t_towl_disp = convert_temperature_from_K(self.hydrate.t_hydrate_towler_mokhatab, t_unit)
+            t_avg_disp = convert_temperature_from_K(self.hydrate.t_hydrate_average, t_unit)
+            
+            results.append(("İşletme Sıcaklığı", self._format_float(op_temp_disp, 2), t_unit))
+            results.append(("İşletme Basıncı", self._format_float(op_pres_disp, 3), p_unit))
+            results.append(("Bağıl Yoğunluk (SG)", f"{self.hydrate.specific_gravity:.4f}", "-"))
+            
+            results.append(("Hammerschmidt Limit Sıcaklığı", self._format_float(t_hamm_disp, 2), t_unit))
+            results.append(("Motiee Limit Sıcaklığı", self._format_float(t_mot_disp, 2), t_unit))
+            results.append(("Towler-Mokhatab Limit Sıcaklığı", self._format_float(t_towl_disp, 2), t_unit))
+            results.append(("Ortalama Limit Sıcaklığı", self._format_float(t_avg_disp, 2), t_unit))
+            
+            # Risk messages
+            def format_risk(risk_bool: bool) -> str:
+                return "RİSK VAR" if risk_bool else "GÜVENLİ"
+                
+            results.append(("Hammerschmidt Riski", format_risk(self.hydrate.risk_hammerschmidt), ""))
+            results.append(("Motiee Riski", format_risk(self.hydrate.risk_motiee), ""))
+            results.append(("Towler-Mokhatab Riski", format_risk(self.hydrate.risk_towler_mokhatab), ""))
+            results.append(("Hidrat Oluşum Riski (Ortalama)", format_risk(self.hydrate.risk_average), ""))
         
         return results
     

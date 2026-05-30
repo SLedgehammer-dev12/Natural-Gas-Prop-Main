@@ -2,7 +2,7 @@
 
 **Modern, modüler termodinamik gaz karışımı hesaplama uygulaması**
 
-![Version](https://img.shields.io/badge/version-v1.3-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.5.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10+-green.svg)
 
 ## 🎯 Özellikler
@@ -17,7 +17,7 @@
 ## 📋 Gereksinimler
 
 - Python 3.10 veya üzeri
-- CoolProp >= 6.4.1
+- CoolProp >= 7.2.0
 - Pydantic >= 2.0.0
 
 ## 🚀 Kurulum
@@ -125,38 +125,23 @@ pytest tests/test_calculator.py -v
 
 ## 📝 Değişiklik Geçmişi
 
-### Sürüm v1.3 (2026-05-09)
-- 🚀 **GERG-2008 ve AGA8-Detail Entegrasyonu:** `pyaga8` kütüphanesi entegre edildi. Doğal gaz için çok daha performanslı ve güvenilir hesaplama seçeneği sunuldu.
-- 📉 **Gelişmiş Karşılaştırma Tablosu:** Z-Faktörü, Pseudo-Reduced P/T değerleri ve tüm hesaplama backendlerinin (GERG-2008, HEOS, SRK, PR, Katz, DAK) Z değerleri aynı anda sunuluyor.
-- 🛠️ **Akıllı Fallback (Geri Çekilme) Sistemi:** GERG-2008'de desteklenmeyen Faz Diyagramı veya Isıl Değer (HHV/LHV) hesaplamalarında otomatik olarak uyumlu CoolProp (HEOS/SRK) algoritmasına geçiş eklendi.
-- 🐛 AGA8 için desteklenmeyen gaz girişlerinde veya %100 toplamın altındaki durumlarda oluşabilen (BadSum) panik hataları düzeltildi.
+### Sürüm v1.5.0 (2026-05-30)
+- 🔥 **Wichert-Aziz Asit Gaz Düzeltmesi:** H₂S ve CO₂ içeren gazlar için Z-faktörü hesabı
+- 📐 **ISO 6976:2016 Isıl Değer Modülü:** Uluslararası standart uyumlu HHV/LHV
+- 📊 **Sutton(1985) Korelasyonu:** SG'den pseudo-kritik özellik tahmini
+- 🐛 **Kritik Düzeltmeler:** Isıl değer mol/kütle kesri, AGA8 normalizasyon, standart koşul gösterimi
+- 🍎 **macOS .dmg:** Self-contained kurulum paketi
+- 🪟 **Windows .exe:** GitHub Actions otomatik build
+- 🧪 **278 test, %78 coverage** (+126 test, 6 yeni dosya)
+- ⚡ CoolProp 7.2.0, thread safety, performans iyileştirmeleri
 
-### Sürüm v1.3 (2026-05-09)
-- Z faktörü için Standing-Katz ANN10/ANN5 ve Dranchuk-Abou-Kassem karşılaştırması eklendi
-- HEOS/SRK/PR başarısız olursa sınırlı geçerlilik uyarılı ANN10 Z-only fallback eklendi
-- PDF raporlarında Türkçe/Unicode karakter desteği düzeltildi
-- Paket adı `natural_gas_main` olarak güncellendi
-- AGA8 calculator referanslarıyla doğal gaz karışımları için Z karşılaştırmaları yapıldı
-
-### Sürüm v1.1 (2026-05-04)
-- HHV/LHV referans veri hesabında molar yüzde için kütle ağırlıklandırması düzeltildi
-- HEOS başarısız olduğunda SRK/PR fallback davranışı etkinleştirildi
-- CoolProp HHV/LHV API ve faz diyagramı uyarıları sadeleştirildi
-
-### Sürüm v1.0 (2025-11-21)
-- 🎉 İlk v1.0 sürümü - Komple modüler refactoring
-- ✅ Pydantic ile veri validasyonu
-- ✅ Type hints tüm kod tabanında
-- ✅ UI ve hesaplama lojiği ayrımı
-- ✅ Özel exception handling
-- ✅ Merkezi konfigürasyon
-
-### G4.9.1'den Farklar
-- **Mimari:** Monolitik → Modüler (15+ modül)
-- **Validasyon:** Manuel → Pydantic
-- **Test Edilebilirlik:** Zor → Kolay
-- **Bakım:** Karmaşık → Basit
-- **Genişletilebilirlik:** Sınırlı → Yüksek
+### Sürüm v1.4.1 (2026-05-18)
+- Kod temizliği: God method ayrıştırması, bare except temizliği, Pydantic v2 uyumu
+- Hata yönetimi: Sessiz except blokları loglamalı hale getirildi
+- Performans: PropsSI cache, pie chart throttle, Z-only fallback optimizasyonu
+- Güvenlik: Download URL GitHub-only doğrulaması
+- UI: Başarı popup kaldırıldı, buton state kurtarma, log filtresi Türkçeleştirildi
+- Test: 133 test, kapsamlı test altyapısı
 
 ## 🤝 Katkıda Bulunma
 

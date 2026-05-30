@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 4, 1, 0),
-    prodvers=(1, 4, 1, 0),
+    filevers=(1, 5, 0, 0),
+    prodvers=(1, 5, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -13,18 +13,18 @@ VSVersionInfo(
   kids=[
     StringFileInfo([
       StringTable(
-        '040904B0',
+        '041f04B0',
         [
           StringStruct('CompanyName', 'Kompresor Pompa'),
           StringStruct('FileDescription', 'Natural Gas Prop Main'),
-          StringStruct('FileVersion', 'v1.4.1'),
+          StringStruct('FileVersion', 'v1.5.0'),
           StringStruct('InternalName', 'Natural Gas Prop Main'),
           StringStruct('OriginalFilename', 'Natural Gas Prop Main.exe'),
           StringStruct('ProductName', 'Natural Gas Prop Main'),
-          StringStruct('ProductVersion', 'v1.4.1')
+          StringStruct('ProductVersion', 'v1.5.0')
         ]
       )
     ]),
-    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+    VarFileInfo([VarStruct('Translation', [1055, 1200])])
   ]
 )

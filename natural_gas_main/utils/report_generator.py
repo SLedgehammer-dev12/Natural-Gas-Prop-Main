@@ -49,6 +49,30 @@ class ReportGenerator:
                 r"C:\Windows\Fonts\segoeuib.ttf",
                 r"C:\Windows\Fonts\segoeuii.ttf",
             ),
+            (
+                "HelveticaMac",
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/System/Library/Fonts/Helvetica.ttc",
+            ),
+            (
+                "ArialMac",
+                "/Library/Fonts/Arial.ttf",
+                "/Library/Fonts/Arial Bold.ttf",
+                "/Library/Fonts/Arial Italic.ttf",
+            ),
+            (
+                "DejaVuLinux",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+            ),
+            (
+                "LiberationLinux",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf",
+            ),
         ])
 
         for family, regular, bold, italic in font_sets:

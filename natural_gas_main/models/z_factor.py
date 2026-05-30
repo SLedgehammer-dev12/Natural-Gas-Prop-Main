@@ -97,7 +97,11 @@ class StandingKatzZFactor:
         self.cp = coolprop_module
 
     def pseudo_critical(self, mixture: GasMixture) -> PseudoCriticalProperties:
-        """Calculate Kay-rule pseudo-critical properties (cached per component)."""
+        """Calculate Kay-rule pseudo-critical properties.
+
+        Applies Wichert-Aziz (1972) correction when H₂S and/or CO₂
+        are present in the mixture.
+        """
         mole_fractions = self._mole_fractions(mixture)
         tpc = 0.0
         ppc = 0.0
@@ -119,7 +123,101 @@ class StandingKatzZFactor:
         if tpc <= 0 or ppc <= 0 or molar_mass <= 0:
             raise ValueError("Pseudo-critical properties could not be calculated")
 
+        y_h2s = mole_fractions.get("HydrogenSulfide", 0.0) + mole_fractions.get("Hidrojen Sülfür", 0.0)
+        y_co2 = mole_fractions.get("CarbonDioxide", 0.0) + mole_fractions.get("Karbondioksit", 0.0)
+        total_acid = y_h2s + y_co2
+
+        if total_acid > 0.001:
+            tpc, ppc = self._wichert_aziz(tpc, ppc, y_h2s, y_co2, total_acid)
+
         return PseudoCriticalProperties(tpc, ppc, molar_mass)
+
+    @staticmethod
+    def _wichert_aziz(
+        tpc_k: float,
+        ppc_pa: float,
+        y_h2s: float,
+        y_co2: float,
+        total_acid: float,
+    ) -> tuple[float, float]:
+        """Apply Wichert-Aziz (1972) correction for acid gases.
+
+        Args:
+            tpc_k: Kay's rule pseudo-critical temperature (K)
+            ppc_pa: Kay's rule pseudo-critical pressure (Pa)
+            y_h2s: H₂S mole fraction
+            y_co2: CO₂ mole fraction
+            total_acid: y_h2s + y_co2
+
+        Returns:
+            (corrected_Tpc_K, corrected_Ppc_Pa)
+
+        Reference:
+            Wichert, E. and Aziz, K. (1972). "Calculate Z's for Sour Gases."
+            Hydrocarbon Processing, Vol. 51, No. 5, pp. 119-122.
+        """
+        epsilon_r = (
+            120.0 * (total_acid ** 0.9 - total_acid ** 1.6)
+            + 15.0 * (y_h2s ** 0.5 - y_h2s ** 4.0)
+        )
+        tpc_r = tpc_k * 9.0 / 5.0
+        tpc_prime_r = tpc_r - epsilon_r
+        ppc_prime_pa = ppc_pa * tpc_prime_r / (
+            tpc_r + y_h2s * (1.0 - y_h2s) * epsilon_r
+        )
+        tpc_prime_k = tpc_prime_r * 5.0 / 9.0
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Wichert-Aziz correction applied: "
+            f"y_H2S={y_h2s:.4f}, y_CO2={y_co2:.4f}, "
+            f"ε={epsilon_r:.2f}°R, "
+            f"Tpc: {tpc_k:.2f}→{tpc_prime_k:.2f}K, "
+            f"Ppc: {ppc_pa/1e5:.3f}→{ppc_prime_pa/1e5:.3f}bar"
+        )
+
+        return tpc_prime_k, ppc_prime_pa
+
+    @staticmethod
+    def sutton_pseudo_critical(
+        sg_gas: float,
+        y_n2: float = 0.0,
+        y_co2: float = 0.0,
+        y_h2s: float = 0.0,
+    ) -> PseudoCriticalProperties:
+        """Sutton (1985) pseudo-critical correlation from specific gravity.
+
+        Use when full gas composition is unknown. Estimates pseudo-critical
+        T and P from SG and non-hydrocarbon impurities.
+
+        Reference: Sutton, R.P. (1985), SPE 14265.
+
+        Returns PseudoCriticalProperties in K and Pa.
+        """
+        y_hc = 1.0 - y_n2 - y_co2 - y_h2s
+        if y_hc <= 0:
+            raise ValueError("Hydrocarbon fraction must be > 0 for Sutton correlation")
+
+        sg_hc = max(0.55, sg_gas - 0.967 * y_n2 - 1.52 * y_co2 - 1.18 * y_h2s)
+
+        tpc_hc_f = 169.2 + 349.5 * sg_hc - 74.0 * sg_hc ** 2
+        ppc_hc_psi = 756.8 - 131.0 * sg_hc - 3.6 * sg_hc ** 2
+
+        tpc_f = y_hc * tpc_hc_f + y_n2 * (-226.0) + y_co2 * (548.0) + y_h2s * (672.0)
+        ppc_psi = y_hc * ppc_hc_psi + y_n2 * 493.0 + y_co2 * 1071.0 + y_h2s * 1306.0
+
+        tpc_k = (tpc_f - 32.0) * 5.0 / 9.0 + 273.15
+        ppc_pa = ppc_psi * 6894.757
+
+        total_acid = y_co2 + y_h2s
+        if total_acid > 0.001 or y_h2s > 0.001:
+            tpc_k, ppc_pa = StandingKatzZFactor._wichert_aziz(
+                tpc_k, ppc_pa, y_h2s, y_co2, total_acid
+            )
+
+        molar_mass = sg_gas * 28.9625 / 1000.0
+        return PseudoCriticalProperties(tpc_k, ppc_pa, molar_mass)
 
     def estimates(
         self,
@@ -176,6 +274,12 @@ class StandingKatzZFactor:
             density = self._reduced_density(ppr, tpr, z_new)
             if abs(z_new - z_old) < self.DAK_TOLERANCE:
                 break
+        else:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"DAK did not converge after {self.DAK_MAX_ITERATIONS} iterations. "
+                f"Last Z={z_new:.4f}, Ppr={ppr:.2f}, Tpr={tpr:.2f}"
+            )
         if not math.isfinite(z_new) or z_new <= 0:
             raise ValueError("DAK did not converge to a physical Z value")
         return z_new

@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.4.1",
-  "date": "2026-05-18",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.4.1",
-  "changelog": "- Kod temizligi: God method ayrismasi, bare except temizligi, Pydantic v2 uyumu.\n- Hata yonetimi: Sessiz except bloklari loglamali hale getirildi.\n- Performans: PropsSI cache, pie chart throttle, Z-only fallback optimizasyonu.\n- Guvenlik: Download URL GitHub-only dogrulamasi.\n- UI: Basari popup kaldirildi, buton state kurtarma, log filtresi Turkcelestirildi.\n- Test: 133 test (47 yeni: converters, Z ANN/DAK, heating values, AGA8, serializer).\n- Preferences: AppData altina tasindi.\n- Version: __init__.py artik config.APP_VERSION'dan okuyor."
+  "version": "v1.5.0",
+  "date": "2026-05-30",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.5.0",
+  "changelog": "- Kritik Duzeltme: Isil deger mol/kutle kesri, AGA8 standart kosul fallback duzeltmesi.\n- Wichert-Aziz (1972) asit gaz duzeltmesi (H2S/CO2 icin Z-faktoru).\n- ISO 6976:2016 uyumlu isil deger hesaplama modulu (16 gaz).\n- Sutton(1985) SG'den pseudo-kritik ozellik korelasyonu.\n- Faz zarfi kritik nokta cikarimi ve HEOS/SRK mantik duzeltmesi.\n- PDF macOS/Linux font destegi (Helvetica, Arial, DejaVu, Liberation).\n- Thread safety lock, preferences in-memory cache, log ring buffer (2000).\n- Welcome dialog dismiss fix, kapatma onay dialogu.\n- CoolProp 7.2.0 guncellemesi.\n- Test: 278 test, %78 coverage (+126 test, 6 yeni dosya)."
 }

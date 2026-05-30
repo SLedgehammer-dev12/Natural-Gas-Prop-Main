@@ -24,7 +24,8 @@ from natural_gas_main.models.calculation_result import (
     HeatingValues,
     VolumeConversion,
     PhaseEnvelopeData,
-    ZFactorComparison
+    ZFactorComparison,
+    HydrateResults
 )
 from natural_gas_main.models.heating_value_db import get_reference_heating_values
 from natural_gas_main.models.z_factor import StandingKatzZFactor
@@ -458,6 +459,12 @@ class ThermoCalculator:
                     normal_volume_error="Z-only fallback normal hacim hesaplamaz"
                 )
 
+            hydrate_results = self._calculate_hydrate_formation(
+                temperature_k,
+                pressure_pa,
+                sg
+            )
+
             return CalculationResult(
                 backend_used="Standing-Katz ANN10 (Z-only fallback)",
                 actual=actual_results,
@@ -470,7 +477,8 @@ class ThermoCalculator:
                     "CoolProp HEOS/SRK/PR başarısız oldu; yalnızca Standing-Katz ANN10 "
                     "ile Z ve yoğunluk tahmini yapıldı. Entalpi, entropi, Cp/Cv ve faz "
                     "bilgileri bu fallbackte hesaplanmaz."
-                )
+                ),
+                hydrate=hydrate_results
             )
         except Exception as e:
             self.logger.warning(f"Standing-Katz ANN10 fallback failed: {e}")
@@ -518,7 +526,8 @@ class ThermoCalculator:
         """Actual + standard results using GERG-2008 / AGA8-Detail."""
         actual_results = calculate_aga8(mixture, temperature_k, pressure_pa, backend)
         standard_results = StandardConditionResults(
-            density_std=1.0, specific_gravity=1.0,
+            density_std=None,
+            specific_gravity=None,
             reference_temperature=standard_T, reference_pressure=standard_P,
             standard_name=standard_name
         )
@@ -536,10 +545,12 @@ class ThermoCalculator:
 
         phase_envelope = None
         try:
-            state = self._create_state(mixture, temperature_k, pressure_pa,
-                                       "HEOS" if not mixture.check_heos_compatibility() else "SRK")
-            phase_envelope = self._calculate_phase_envelope(state,
-                "HEOS" if not mixture.check_heos_compatibility() else "SRK")
+            if mixture.check_heos_compatibility():
+                pe_backend = "HEOS"
+            else:
+                pe_backend = "SRK"
+            state = self._create_state(mixture, temperature_k, pressure_pa, pe_backend)
+            phase_envelope = self._calculate_phase_envelope(state, pe_backend)
         except Exception:
             pass
 
@@ -564,39 +575,129 @@ class ThermoCalculator:
         standard_T, standard_P
     ):
         """Common post-processing: heating, volume, Z-comparison, packaging."""
+        rho_std = standard_results.density_std
+        sg = standard_results.specific_gravity
+
+        if rho_std is None or sg is None:
+            self.logger.warning(
+                "Standard condition calculation failed; heating values and "
+                "volume conversion will be limited."
+            )
+
         heating_results = self._calculate_heating_values(
-            mixture,
-            standard_results.density_std,
-            standard_results.specific_gravity,
-            backend,
-            standard_T,
-            standard_P
+            mixture, rho_std, sg, backend, standard_T, standard_P
         )
         volume_results = None
-        if volume_m3 is not None:
+        if volume_m3 is not None and rho_std is not None:
             cp_backend = backend
             if cp_backend in ["GERG-2008", "AGA8-Detail"]:
-                cp_backend = "HEOS" if not mixture.check_heos_compatibility() else "SRK"
+                cp_backend = "HEOS" if mixture.check_heos_compatibility() else "SRK"
             volume_results = self._calculate_volume_conversion(
-                volume_m3,
-                actual_results.density,
-                standard_results.density_std,
-                mixture,
-                cp_backend
+                volume_m3, actual_results.density, rho_std, mixture, cp_backend
             )
+        hydrate_results = self._calculate_hydrate_formation(
+            temperature_k, pressure_pa, sg
+        )
         result = CalculationResult(
             backend_used=backend,
             actual=actual_results,
             standard=standard_results,
             heating=heating_results,
             volume_conversion=volume_results,
-            phase_envelope=phase_envelope
+            phase_envelope=phase_envelope,
+            hydrate=hydrate_results
         )
         result.z_factor_comparison = self._calculate_z_factor_comparison(
             mixture, temperature_k, pressure_pa,
             main_actual=actual_results, main_backend=backend,
         )
         return result
+
+    def _calculate_hydrate_formation(
+        self,
+        temperature_k: float,
+        pressure_pa: float,
+        specific_gravity: Optional[float]
+    ) -> Optional[HydrateResults]:
+        """Calculate gas hydrate formation temperature.
+
+        Args:
+            temperature_k: Operating temperature in Kelvin
+            pressure_pa: Operating pressure in Pascals
+            specific_gravity: Gas specific gravity (dimensionless)
+
+        Returns:
+            HydrateResults object or None if calculation fails
+        """
+        try:
+            if specific_gravity is None or pressure_pa <= 0 or specific_gravity <= 0:
+                self.logger.warning(
+                    f"Hydrate calculation skipped due to invalid inputs: "
+                    f"pressure={pressure_pa} Pa, specific_gravity={specific_gravity}"
+                )
+                return None
+
+            # Convert pressure from Pa to psia
+            # 1 psi = 6894.757 Pa
+            p_psia = pressure_pa / 6894.757
+            if p_psia <= 0:
+                return None
+
+            # Calculate temperatures in Fahrenheit
+            # 1. Hammerschmidt (1934)
+            t_f_hammerschmidt = 8.9 * (p_psia ** 0.285) - 38.2
+
+            # 2. Motiee (1991)
+            log_p = math.log10(p_psia)
+            t_f_motiee = (
+                -238.24469
+                + 78.99667 * log_p
+                - 5.352544 * (log_p ** 2)
+                + 349.473877 * specific_gravity
+                - 150.854675 * (specific_gravity ** 2)
+                - 27.604065 * log_p * specific_gravity
+            )
+
+            # 3. Towler & Mokhatab (2005)
+            ln_p = math.log(p_psia)
+            ln_gamma = math.log(specific_gravity)
+            t_f_towler_mokhatab = (
+                13.47 * ln_p
+                + 34.27 * ln_gamma
+                - 1.675 * ln_gamma * ln_p
+                - 20.35
+            )
+
+            # Convert predicted temperatures to Kelvin
+            t_k_hammerschmidt = (t_f_hammerschmidt - 32) * 5 / 9 + 273.15
+            t_k_motiee = (t_f_motiee - 32) * 5 / 9 + 273.15
+            t_k_towler_mokhatab = (t_f_towler_mokhatab - 32) * 5 / 9 + 273.15
+
+            # Average of predicted temperatures
+            t_k_average = (t_k_hammerschmidt + t_k_motiee + t_k_towler_mokhatab) / 3.0
+
+            # Hydrate formation risk assessment
+            risk_hammerschmidt = temperature_k <= t_k_hammerschmidt
+            risk_motiee = temperature_k <= t_k_motiee
+            risk_towler_mokhatab = temperature_k <= t_k_towler_mokhatab
+            risk_average = temperature_k <= t_k_average
+
+            return HydrateResults(
+                specific_gravity=specific_gravity,
+                operating_temperature=temperature_k,
+                operating_pressure=pressure_pa,
+                t_hydrate_hammerschmidt=t_k_hammerschmidt,
+                t_hydrate_motiee=t_k_motiee,
+                t_hydrate_towler_mokhatab=t_k_towler_mokhatab,
+                t_hydrate_average=t_k_average,
+                risk_hammerschmidt=risk_hammerschmidt,
+                risk_motiee=risk_motiee,
+                risk_towler_mokhatab=risk_towler_mokhatab,
+                risk_average=risk_average
+            )
+        except Exception as e:
+            self.logger.error(f"Error calculating hydrate formation: {e}")
+            return None
     def _create_state(
         self,
         mixture: GasMixture,
@@ -659,15 +760,34 @@ class ThermoCalculator:
             pe_data = state.get_phase_envelope_data()
             T_array = list(pe_data.T)
             P_array = list(pe_data.p)
-            
+
             if not T_array or not P_array:
                 return None
-                
+
+            cricondentherm_t = max(T_array)
+
+            # Find the pressure at cricondentherm (not just max(P_array))
+            cricondenbar_p: Optional[float] = None
+            max_p_idx = P_array.index(max(P_array))
+            cricondenbar_t = T_array[max_p_idx]
+            cricondenbar_p = P_array[max_p_idx]
+
+            # Try to extract critical point from CoolProp state
+            critical_t: Optional[float] = None
+            critical_p: Optional[float] = None
+            try:
+                critical_t = state.keyed_output(CP.iT_critical)
+                critical_p = state.keyed_output(CP.iP_critical)
+            except Exception:
+                pass
+
             return PhaseEnvelopeData(
                 temperature_k=T_array,
                 pressure_pa=P_array,
-                cricondentherm_t=max(T_array),
-                cricondenbar_p=max(P_array)
+                cricondentherm_t=cricondentherm_t,
+                cricondenbar_p=cricondenbar_p,
+                critical_t=critical_t,
+                critical_p=critical_p,
             )
         except Exception as e:
             self.logger.info(
@@ -780,30 +900,35 @@ class ThermoCalculator:
     def _calculate_heating_values(
         self,
         mixture: GasMixture,
-        rho_std: float,
-        sg: float,
+        rho_std: Optional[float],
+        sg: Optional[float],
         backend: str,
         T_ref: float,
         P_ref: float
     ) -> Optional[HeatingValues]:
-        # CoolProp API requires CoolProp backends
-        if backend in ["GERG-2008", "AGA8-Detail"]:
-            backend = "HEOS" if not mixture.check_heos_compatibility() else "SRK"
+        """Calculate heating values with 3-stage fallback.
 
-        """
-        Calculate heating values with 3-stage fallback.
-        
         Args:
             mixture: Gas mixture
-            rho_std: Standard density (kg/Sm³)
-            sg: Specific gravity
+            rho_std: Standard density (kg/Sm³), may be None
+            sg: Specific gravity, may be None
             backend: Backend being used
             T_ref: Reference temperature for combustion (K)
             P_ref: Reference pressure (Pa)
-            
+
         Returns:
             Heating values or None if calculation fails
         """
+        if rho_std is None or rho_std <= 0:
+            self.logger.warning(
+                "Standard density unavailable; skipping heating value calculation."
+            )
+            return None
+
+        # CoolProp API requires CoolProp backends
+        if backend in ["GERG-2008", "AGA8-Detail"]:
+            backend = "HEOS" if mixture.check_heos_compatibility() else "SRK"
+
         # Try Stage 1: Built-in method (HEOS only)
         if backend == "HEOS":
             try:
@@ -902,16 +1027,19 @@ class ThermoCalculator:
         T_ref: float,
         P_ref: float
     ) -> Tuple[float, float]:
+        """Calculate heating values by summing component contributions.
+
+        HHVmass()/LHVmass() returns J/kg, converted to MJ/kg.
+        Weights are mass fractions; molar fractions are converted via
+        _get_heating_value_mass_weights to match the mass-basis API.
         """
-        Calculate heating values by summing component contributions.
-        """
+        weights = self._get_heating_value_mass_weights(mixture)
         total_hhv = 0.0
         total_lhv = 0.0
         missing_api_logged = False
         
         for component in mixture.components:
             try:
-                # Create state for single component
                 component_name = GasMixture._format_gas_name_for_coolprop(component.name)
                 state = CP.AbstractState(backend, component_name)
                 state.update(CP.PT_INPUTS, P_ref, T_ref)
@@ -922,17 +1050,19 @@ class ThermoCalculator:
                         missing_api_logged = True
                     continue
                 
-                hhv = state.HHVmass() / 1e6  # MJ/kg
+                hhv = state.HHVmass() / 1e6
                 lhv = state.LHVmass() / 1e6
                 
-                # Zero values mean no data available
-                if hhv < 1e-6: hhv = 0.0
-                if lhv < 1e-6: lhv = 0.0
+                if hhv < 1e-6:
+                    hhv = 0.0
+                if lhv < 1e-6:
+                    lhv = 0.0
                 
-                # Add weighted contribution
-                fraction_decimal = component.to_decimal()
-                total_hhv += fraction_decimal * hhv
-                total_lhv += fraction_decimal * lhv
+                weight = weights.get(component.name, component.to_decimal())
+                if weight <= 0:
+                    continue
+                total_hhv += weight * hhv
+                total_lhv += weight * lhv
                 
             except Exception as e:
                 self.logger.warning(
@@ -1041,30 +1171,26 @@ class ThermoCalculator:
         hhv_mass: float,
         lhv_mass: float,
         rho_std: float,
-        sg: float,
+        sg: Optional[float],
         method: str
     ) -> HeatingValues:
-        """
-        Package heating values into result model.
-        
+        """Package heating values into result model.
+
         Args:
             hhv_mass: HHV in MJ/kg
             lhv_mass: LHV in MJ/kg
             rho_std: Standard density (kg/Sm³)
-            sg: Specific gravity
+            sg: Specific gravity (may be None)
             method: Calculation method description
-            
-        Returns:
-            Heating values model
         """
-        # Volumetric basis
-        hhv_vol = hhv_mass * rho_std  # MJ/Sm³
-        lhv_vol = lhv_mass * rho_std  # MJ/Sm³
-        
-        # Wobbe index
-        wobbe = hhv_vol / (sg ** 0.5)
-        
-        # Industrial units (Btu/SCF)
+        hhv_vol = hhv_mass * rho_std
+        lhv_vol = lhv_mass * rho_std
+
+        if sg is not None and sg > 0:
+            wobbe = hhv_vol / (sg ** 0.5)
+        else:
+            wobbe = 0.0
+
         hhv_btu_scf = hhv_vol * config.MMBTU_PER_MJ / config.M3_TO_SCF * 1e6
         
         return HeatingValues(

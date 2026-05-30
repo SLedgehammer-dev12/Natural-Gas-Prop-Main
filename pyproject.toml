@@ -4,19 +4,30 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "natural-gas-prop-main"
-version = "1.4.1"
+version = "1.5.0"
 description = "Termodinamik doğal gaz karışımı hesaplama uygulaması"
 readme = "README.md"
 license = { text = "Proprietary - Kompresör Pompa" }
 requires-python = ">=3.10"
+authors = [
+    { name = "Kompresör Pompa" },
+]
 dependencies = [
-    "CoolProp>=6.4.1",
+    "CoolProp>=7.2.0",
     "pydantic>=2.0.0",
     "customtkinter>=5.2.2",
     "matplotlib>=3.10.0",
     "fpdf2>=2.8.0",
     "pyaga8>=0.1.16",
+    "packaging>=21.0",
 ]
+
+[project.scripts]
+natural-gas-prop = "natural_gas_main.main:main"
+
+[project.urls]
+Repository = "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main"
+Issues = "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/issues"
 
 [tool.setuptools.packages.find]
 include = ["natural_gas_main", "natural_gas_main.*"]
@@ -30,7 +41,21 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=50"
+addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=50 --strict-markers -ra"
+markers = [
+    "slow: Yavaş testler (CoolProp bağımlı)",
+    "integration: Entegrasyon testleri",
+    "unit: Birim testleri",
+    "ui: GUI testleri (headless'da skip)",
+    "accuracy: Doğruluk validasyon testleri",
+]
+
+[tool.coverage.run]
+omit = [
+    "natural_gas_main/ui/*",
+    "natural_gas_main/main.py",
+]
+
 
 [tool.mypy]
 python_version = "3.10"

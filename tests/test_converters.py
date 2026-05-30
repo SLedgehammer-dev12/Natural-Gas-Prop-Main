@@ -39,6 +39,13 @@ class TestTemperatureToKelvin:
         with pytest.raises(ValidationError):
             convert_temperature_to_K(100, "Rankine")
 
+    def test_empty_string_raises(self):
+        with pytest.raises(ValidationError):
+            convert_temperature_to_K(0.0, "")
+
+    def test_negative_kelvin_passes_through(self):
+        assert convert_temperature_to_K(-500.0, "K") == -500.0
+
 
 class TestTemperatureFromKelvin:
     def test_kelvin_to_celsius(self):
@@ -61,7 +68,7 @@ class TestPressureToPascal:
 
     def test_bar_gauge_to_pa(self):
         result = convert_pressure_to_Pa(0, "bar(g)")
-        assert result == pytest.approx(101325.0)  # atmospheric
+        assert result == pytest.approx(101325.0)
 
     def test_mpa_to_pa(self):
         assert convert_pressure_to_Pa(1, "MPa") == pytest.approx(1e6)
@@ -80,10 +87,17 @@ class TestPressureToPascal:
         with pytest.raises(ValidationError):
             convert_pressure_to_Pa(100, "torr")
 
-    def test_negative_pressure_converts_as_is(self):
-        # converter does not reject negatives; validators handle that
+    def test_negative_pressure_converts(self):
         result = convert_pressure_to_Pa(-1, "bar(a)")
-        assert result < 0  # validates conversion, not rejection
+        assert result < 0
+
+    def test_zero_pressure_converts(self):
+        assert convert_pressure_to_Pa(0.0, "bar(a)") == 0.0
+
+    def test_roundtrip_bar(self):
+        pa = convert_pressure_to_Pa(2.5, "bar(a)")
+        bar = convert_pressure_from_Pa(pa, "bar(a)")
+        assert bar == pytest.approx(2.5)
 
 
 class TestPressureFromPascal:
@@ -114,6 +128,13 @@ class TestVolumeConversion:
         result = convert_volume_to_m3(35.3147, "ft³")
         assert result == pytest.approx(1.0, rel=1e-4)
 
-    def test_negative_volume_converts_as_is(self):
+    def test_negative_volume_converts(self):
         result = convert_volume_to_m3(-1, "m³")
         assert result < 0
+
+    def test_invalid_unit_raises(self):
+        with pytest.raises(ValidationError):
+            convert_volume_to_m3(1.0, "gal")
+
+    def test_large_volume(self):
+        assert convert_volume_to_m3(1e9, "m³") == pytest.approx(1e9)
