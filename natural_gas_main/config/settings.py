@@ -115,7 +115,7 @@ class AppConfig(BaseModel):
     # Logging Configuration
     LOG_FILE: str = Field(
         default="thermo_gas_calculator.log",
-        description="Log file path"
+        description="Log file path (relative paths resolve to user home directory)"
     )
     LOG_LEVEL: str = Field(
         default="INFO",
