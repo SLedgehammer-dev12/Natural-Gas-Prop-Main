@@ -83,7 +83,7 @@ def main():
         except Exception:
             pass
         print(f"HATA: Gerekli modül bulunamadı: {e}")
-        print("Lütfen 'pip install -r requirements.txt' komutunu çalıştırın.")
+        print("Bağımlılıkları yüklemek için: pip install natural-gas-prop-main")
         sys.exit(1)
         
     except Exception as e:
