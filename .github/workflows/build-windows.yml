@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -26,6 +30,7 @@ jobs:
       - name: Build Windows EXE
         run: |
           pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
+          dir dist\
 
       - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
