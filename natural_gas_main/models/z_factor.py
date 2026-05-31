@@ -207,7 +207,7 @@ class StandingKatzZFactor:
         tpc_f = y_hc * tpc_hc_f + y_n2 * (-226.0) + y_co2 * (548.0) + y_h2s * (672.0)
         ppc_psi = y_hc * ppc_hc_psi + y_n2 * 493.0 + y_co2 * 1071.0 + y_h2s * 1306.0
 
-        tpc_k = (tpc_f - 32.0) * 5.0 / 9.0 + 273.15
+        tpc_k = tpc_f * 5.0 / 9.0
         ppc_pa = ppc_psi * 6894.757
 
         total_acid = y_co2 + y_h2s

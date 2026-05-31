@@ -51,15 +51,21 @@ class ReportGenerator:
             ),
             (
                 "HelveticaMac",
-                "/System/Library/Fonts/Helvetica.ttc",
-                "/System/Library/Fonts/Helvetica.ttc",
-                "/System/Library/Fonts/Helvetica.ttc",
+                "/System/Library/Fonts/Helvetica.dfont",
+                "/System/Library/Fonts/Helvetica.dfont",
+                "/System/Library/Fonts/Helvetica.dfont",
             ),
             (
                 "ArialMac",
                 "/Library/Fonts/Arial.ttf",
                 "/Library/Fonts/Arial Bold.ttf",
                 "/Library/Fonts/Arial Italic.ttf",
+            ),
+            (
+                "DejaVuMac",
+                "/Library/Fonts/DejaVuSans.ttf",
+                "/Library/Fonts/DejaVuSans-Bold.ttf",
+                "/Library/Fonts/DejaVuSans-Oblique.ttf",
             ),
             (
                 "DejaVuLinux",
@@ -364,8 +370,10 @@ class ReportGenerator:
         # Footer
         pdf.set_y(-20)
         pdf.set_font(font_family, "I", 8)
-        pdf.cell(0, 10, f"Sayfa {pdf.page_no()}", align='C')
+        y = pdf.get_y()
         pdf.cell(0, 10, "Natural Gas Prop Main © 2026 Kompresör Pompa", align='R')
+        pdf.set_xy(pdf.l_margin, y)
+        pdf.cell(0, 10, f"Sayfa {pdf.page_no()}", align='L')
         
         pdf.output(file_path)
     
@@ -411,5 +419,11 @@ class ReportGenerator:
             gas_composition,
             log_file=log_file
         )
-        ReportGenerator.save_to_file(report, file_path)
+        try:
+            ReportGenerator.save_to_file(report, file_path)
+        except IOError:
+            raise IOError(
+                f"Rapor dosyaya kaydedilemedi: {file_path}. "
+                f"Hata: Dosya yazılamıyor veya yol geçersiz."
+            )
 

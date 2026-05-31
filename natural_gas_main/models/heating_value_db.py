@@ -70,7 +70,7 @@ REFERENCE_HEATING_VALUES: Dict[str, Tuple[float, float]] = {
     # Combustible special cases
     "Hydrogen": (141.80, 119.96),  # Very high heating value
     "CarbonMonoxide": (10.10, 10.10),  # Same HHV and LHV (no H2O formed)
-    "HydrogenSulfide": (15.24, 13.98),  # Toxic, but combustible
+    "HydrogenSulfide": (16.495, 15.192),  # ISO 6976:2016 standard values (previously had wrong 15.24/13.98 from Engineering Toolbox)
 }
 
 

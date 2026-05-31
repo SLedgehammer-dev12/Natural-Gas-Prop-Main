@@ -112,10 +112,10 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.5.0 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.5.1 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.5.0 sürümü: Wichert-Aziz asit gaz düzeltmesi, ISO 6976:2016,\n"
+        "v1.5.1 sürümü: Kritik hata düzeltmeleri ve hesaplama doğruluğu iyileştirmeleri,\n"
         "Sutton korelasyonu, kritik düzeltmeler ve 278 test.\n\n"
         "© 2026 Kompresör Pompa"
     )
@@ -154,9 +154,10 @@ def show_user_guide_dialog() -> None:
 
 def show_new_features_info() -> None:
     """Show new features information for v1.4 with do not show again option."""
+    from natural_gas_main.config.settings import config
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.5.0")
+    dialog.title("Yenilikler - Sürüm v1.5.1")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
@@ -173,7 +174,22 @@ def show_new_features_info() -> None:
     ).pack(pady=(0, 20))
     
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.5.0):\n"
+        "🌟 YENİ ÖZELLİKLER (v1.5.1):\n"
+        "• Kritik Hata Düzeltmeleri: HEOS/SRK backend seçimi ters mantık düzeltildi.\n"
+        "• Sutton Sıcaklık Dönüşümü: °R→K dönüşüm hatası giderildi (~255K sapma).\n"
+        "• H₂S Isıl Değer: %7.6 hata düzeltildi (ISO 6976:2016 uyumlu).\n"
+        "• ISO 6976:2016 Modülü: 8 yeni bileşen (O₂, Ar, He, H₂O, Air, Neopentane, n-Nonan, n-Dekan).\n"
+        "• Kütle-Bazlı Sıcaklık Düzeltmesi: ISO 6976:2016 §8.3'e göre kaldırıldı.\n"
+        "• Atomik Dosya Yazma: Veri kaybı önlemi (tempfile + os.replace).\n"
+        "• Thread Güvenliği: Lock ile yarış durumu engellendi.\n"
+        "• CoolProp Log Gürültüsü: debug_level=0 ile susturuldu.\n"
+        "• PDF Footer: macOS Helvetica.dfont yolu, sol/sağ hizalama.\n"
+        "• Fraksiyon Normalizasyonu: normalize_fractions() metodu.\n"
+        "• Gaz Adı Eşleme: difflib ile fuzzy eşleme (örn. Butane→n-Butane).\n"
+        "• Cricondenbar T: Faz zarfına eklendi.\n"
+        "• Pasta Grafiği: Dark mode renk düzeltmesi.\n"
+        "• Şema Versiyon Zorunluluğu: Uyumsuz .ngp dosyaları reddedilir.\n\n"
+        "🌟 ÖNCEKİ ÖZELLİKLER (v1.5.0):\n"
         "• Wichert-Aziz Düzeltmesi: Asit gaz (H₂S/CO₂) için doğru Z-faktörü hesabı.\n"
         "• ISO 6976:2016 Modülü: Uluslararası standart uyumlu ısıl değer hesaplama.\n"
         "• Sutton(1985) Korelasyonu: SG'den pseudo-kritik özellik tahmini.\n"

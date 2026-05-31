@@ -67,15 +67,16 @@ class ThermoApp(ctk.CTk):
         self.calculator = ThermoCalculator()
         self._calc_lock = threading.Lock()
         self._is_calculating = False
-        
+
         self.result_queue = queue.Queue()
-        self._check_queue()
 
         
         # Create UI
         self._create_menu()
         self._create_main_layout()
         self._create_status_bar()
+        
+        self._check_queue()
         
         # Show welcome message
         self.after(100, self._show_welcome)
@@ -306,8 +307,10 @@ class ThermoApp(ctk.CTk):
     
     def _on_calculate(self):
         """Handle calculate button click."""
-        if self._is_calculating:
-            return
+        with self._calc_lock:
+            if self._is_calculating:
+                return
+            self._is_calculating = True
 
         try:
             inputs = self.input_panel.get_all_inputs()
@@ -329,7 +332,6 @@ class ThermoApp(ctk.CTk):
             self.calc_button.configure(state="disabled", fg_color="#FFA500", text="Hesaplanıyor...")
             self.calc_progress.pack(fill=tk.X, pady=(5, 0))
             self.calc_progress.start()
-            self._is_calculating = True
 
             # Run in thread
             thread = threading.Thread(
@@ -342,28 +344,35 @@ class ThermoApp(ctk.CTk):
         except ValidationError as e:
             dialogs.show_error("Giriş Hatası", str(e))
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
-            self._is_calculating = False
+            with self._calc_lock:
+                self._is_calculating = False
         except ThermoCalculationError as e:
             messagebox.showerror("Giriş Hatası", str(e))
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
-            self._is_calculating = False
+            with self._calc_lock:
+                self._is_calculating = False
         except Exception as e:
             messagebox.showerror("Hata", f"Beklenmeyen hata: {e}")
             logging.error(f"Input processing failed: {e}", exc_info=True)
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
-            self._is_calculating = False
+            with self._calc_lock:
+                self._is_calculating = False
 
     def _check_queue(self):
         """Check queue for calculation results."""
         try:
             while True:
                 msg_type, data = self.result_queue.get_nowait()
-                if msg_type == "success":
-                    result, used_backend, inputs = data
-                    self._on_calculation_success(result, used_backend, inputs)
-                elif msg_type == "error":
-                    self._on_calculation_error(data)
-                self.result_queue.task_done()
+                try:
+                    if msg_type == "success":
+                        result, used_backend, inputs = data
+                        self._on_calculation_success(result, used_backend, inputs)
+                    elif msg_type == "error":
+                        self._on_calculation_error(data)
+                except Exception as e:
+                    self._on_calculation_error(e)
+                finally:
+                    self.result_queue.task_done()
         except queue.Empty:
             pass
         finally:
@@ -412,10 +421,6 @@ class ThermoApp(ctk.CTk):
             used_backend: Backend that was used
             inputs: Original inputs
         """
-        # Stop progress
-        self.progress_bar.stop()
-        self.progress_bar.pack_forget()
-        
         # Display results
         self.output_panel.display_results(result)
         
@@ -440,7 +445,8 @@ class ThermoApp(ctk.CTk):
         self.calc_progress.stop()
         self.calc_progress.pack_forget()
         self.calc_button.configure(state="normal", fg_color="#4CAF50", text="Hesapla")
-        self._is_calculating = False
+        with self._calc_lock:
+            self._is_calculating = False
     
     def _on_calculation_error(self, error: Exception):
         """
@@ -455,7 +461,8 @@ class ThermoApp(ctk.CTk):
         
         # Re-enable UI
         self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
-        self._is_calculating = False
+        with self._calc_lock:
+            self._is_calculating = False
         
         # Get log lines
         log_lines = self._get_recent_log_lines(10)

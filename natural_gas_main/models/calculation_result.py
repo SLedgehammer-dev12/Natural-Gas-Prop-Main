@@ -84,14 +84,15 @@ class VolumeConversion(BaseModel):
 
 class PhaseEnvelopeData(BaseModel):
     """Phase envelope (dew point and bubble point curve) data."""
-    
+
     temperature_k: List[float] = Field(..., description="Temperatures in Kelvin")
     pressure_pa: List[float] = Field(..., description="Pressures in Pascals")
     cricondentherm_t: Optional[float] = Field(None, description="Maximum temperature on the envelope")
     cricondenbar_p: Optional[float] = Field(None, description="Maximum pressure on the envelope")
+    cricondenbar_t: Optional[float] = Field(None, description="Temperature at cricondenbar pressure")
     critical_t: Optional[float] = Field(None, description="Critical point temperature")
     critical_p: Optional[float] = Field(None, description="Critical point pressure")
-    
+
     model_config = {"frozen": False}
 
 

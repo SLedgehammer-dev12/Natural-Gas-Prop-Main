@@ -127,9 +127,14 @@ class TestWichertAziz:
 
 class TestSuttonCorrelation:
     def test_sweet_gas_typical(self):
-        """Sutton for sweet gas with SG=0.65."""
+        """Sutton for sweet gas with SG=0.65.
+        
+        Sutton correlation gives Tpc in °R = 169.2 + 349.5*SG - 74.0*SG².
+        For SG=0.65: Tpc = 365.11 °R = 202.84 K.
+        Correct conversion: °R * 5/9 (NOT °F → K conversion which was bug).
+        """
         props = StandingKatzZFactor.sutton_pseudo_critical(0.65)
-        assert 350 < props.temperature_k < 500
+        assert 190 < props.temperature_k < 220
         assert 4e6 < props.pressure_pa < 5e6
 
     def test_heavier_gas_higher_tpc(self):

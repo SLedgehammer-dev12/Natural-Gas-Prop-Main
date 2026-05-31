@@ -30,6 +30,7 @@ from natural_gas_main.models.calculation_result import (
 from natural_gas_main.models.heating_value_db import get_reference_heating_values
 from natural_gas_main.models.z_factor import StandingKatzZFactor
 from natural_gas_main.models.aga8_calculator import calculate_aga8, PYAGA8_AVAILABLE
+from natural_gas_main.models.iso6976 import calculate_iso6976_heating_values, is_iso6976_compatible
 
 CP = None
 COOLPROP_AVAILABLE = False
@@ -37,6 +38,7 @@ COOLPROP_AVAILABLE = False
 try:
     import CoolProp.CoolProp as CP
     COOLPROP_AVAILABLE = True
+    CP.set_debug_level(0)
     logging.info("CoolProp başarıyla yüklendi")
 except ImportError as e:
     logging.error(f"CoolProp içe aktarılamadı: {e}")
@@ -545,7 +547,7 @@ class ThermoCalculator:
 
         phase_envelope = None
         try:
-            if mixture.check_heos_compatibility():
+            if not mixture.check_heos_compatibility():
                 pe_backend = "HEOS"
             else:
                 pe_backend = "SRK"
@@ -591,7 +593,7 @@ class ThermoCalculator:
         if volume_m3 is not None and rho_std is not None:
             cp_backend = backend
             if cp_backend in ["GERG-2008", "AGA8-Detail"]:
-                cp_backend = "HEOS" if mixture.check_heos_compatibility() else "SRK"
+                cp_backend = "SRK" if mixture.check_heos_compatibility() else "HEOS"
             volume_results = self._calculate_volume_conversion(
                 volume_m3, actual_results.density, rho_std, mixture, cp_backend
             )
@@ -786,6 +788,7 @@ class ThermoCalculator:
                 pressure_pa=P_array,
                 cricondentherm_t=cricondentherm_t,
                 cricondenbar_p=cricondenbar_p,
+                cricondenbar_t=cricondenbar_t,
                 critical_t=critical_t,
                 critical_p=critical_p,
             )
@@ -927,7 +930,7 @@ class ThermoCalculator:
 
         # CoolProp API requires CoolProp backends
         if backend in ["GERG-2008", "AGA8-Detail"]:
-            backend = "HEOS" if mixture.check_heos_compatibility() else "SRK"
+            backend = "SRK" if mixture.check_heos_compatibility() else "HEOS"
 
         # Try Stage 1: Built-in method (HEOS only)
         if backend == "HEOS":
@@ -967,7 +970,27 @@ class ThermoCalculator:
                 )
         except Exception as e:
             self.logger.info(f"CoolProp component HHV/LHV unavailable: {e}")
-        
+
+        # Try Stage 2.5: ISO 6976:2016 stoichiometric method
+        try:
+            if is_iso6976_compatible(mixture, GasMixture._format_gas_name_for_coolprop):
+                hhv_mass, lhv_mass = calculate_iso6976_heating_values(
+                    mixture,
+                    GasMixture._format_gas_name_for_coolprop,
+                    T_ref
+                )
+                if hhv_mass is not None and lhv_mass is not None and hhv_mass > 0:
+                    self.logger.info("Using ISO 6976:2016 standard heating values")
+                    return self._package_heating_values(
+                        hhv_mass,
+                        lhv_mass,
+                        rho_std,
+                        sg,
+                        "ISO 6976:2016"
+                    )
+        except Exception as e:
+            self.logger.info(f"ISO 6976 HHV/LHV unavailable: {e}")
+
         # Try Stage 3: Reference database
         try:
             # Note: Database values are typically at 15°C or 25°C.

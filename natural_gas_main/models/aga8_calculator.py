@@ -75,6 +75,13 @@ def calculate_aga8(
         raise BackendNotAvailableError(method)
 
     logger = logging.getLogger(__name__)
+
+    if method not in ("GERG-2008", "AGA8-Detail"):
+        logger.warning(
+            f"Bilinmeyen AGA8 metodu '{method}', AGA8-Detail kullanılıyor."
+        )
+        method = "AGA8-Detail"
+
     comp = pyaga8.Composition()
 
     sum_fractions = 0.0
@@ -100,11 +107,12 @@ def calculate_aga8(
             f"Atlanan bileşenler: {', '.join(unmapped_gases)}. AGA8 kullanılamaz."
         )
 
-    if unmapped_gases and sum_fractions < 0.99:
+    if unmapped_gases and abs(sum_fractions - 1.0) > 1e-5:
         logger.warning(
-            f"AGA8 bileşenlerinin toplamı {sum_fractions}. "
+            f"AGA8 bileşenlerinin toplamı {sum_fractions:.4f}. "
             f"AGA8'de tanınmayan bileşenler ({', '.join(unmapped_gases)}) "
-            f"normalize ediliyor. Sonuçlarda sapma olabilir!"
+            f"normalize ediliyor. Bu bileşenlerin fraksiyonları diğerlerine "
+            f"oransal olarak dağıtılacak. Sonuçlarda sapma olabilir!"
         )
 
     if abs(sum_fractions - 1.0) > 1e-5:

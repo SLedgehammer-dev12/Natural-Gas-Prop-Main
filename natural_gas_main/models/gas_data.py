@@ -7,9 +7,76 @@ Defines Pydantic models for gas components and mixtures with validation.
 from typing import List, Literal
 from pydantic import BaseModel, Field, field_validator, computed_field
 import re
+import difflib
 
 from natural_gas_main.config.settings import config
 from natural_gas_main.core.exceptions import ValidationError
+
+
+COOLPROP_NAME_MAP = {
+    'methane': 'Methane',
+    'ethane': 'Ethane',
+    'propane': 'n-Propane',
+    'npropane': 'n-Propane',
+    'n-propane': 'n-Propane',
+    'n-butane': 'n-Butane',
+    'nbutane': 'n-Butane',
+    'isobutane': 'IsoButane',
+    'iso-butane': 'IsoButane',
+    'nitrogen': 'Nitrogen',
+    'carbondioxide': 'CarbonDioxide',
+    'hydrogen': 'Hydrogen',
+    'oxygen': 'Oxygen',
+    'argon': 'Argon',
+    'helium': 'Helium',
+    'water': 'Water',
+    'air': 'Air',
+    'hydrogensulfide': 'HydrogenSulfide',
+    'hydrogen-sulfide': 'HydrogenSulfide',
+    'carbonmonoxide': 'CarbonMonoxide',
+    'carbonylsulfide': 'CarbonylSulfide',
+    'carbonyl-sulfide': 'CarbonylSulfide',
+    'sulfurdioxide': 'SulfurDioxide',
+    'sulfur-dioxide': 'SulfurDioxide',
+    'n-pentane': 'n-Pentane',
+    'npentane': 'n-Pentane',
+    'isopentane': 'Isopentane',
+    'neopentane': 'Neopentane',
+    'n-hexane': 'n-Hexane',
+    'nhexane': 'n-Hexane',
+    'isohexane': 'Isohexane',
+    'n-heptane': 'n-Heptane',
+    'nheptane': 'n-Heptane',
+    'n-octane': 'n-Octane',
+    'noctane': 'n-Octane',
+    'n-nonane': 'n-Nonane',
+    'nnonane': 'n-Nonane',
+    'n-decane': 'n-Decane',
+    'ndecane': 'n-Decane',
+    'n-undecane': 'n-Undecane',
+    'nundecane': 'n-Undecane',
+    'n-dodecane': 'n-Dodecane',
+    'ndodecane': 'n-Dodecane',
+    'ethylene': 'Ethylene',
+    'propylene': 'Propylene',
+    '1-butene': '1-Butene',
+    '1butene': '1-Butene',
+    'isobutene': 'IsoButene',
+    'cis-2-butene': 'cis-2-Butene',
+    'cis2butene': 'cis-2-Butene',
+    'trans-2-butene': 'trans-2-Butene',
+    'trans2butene': 'trans-2-Butene',
+    'cyclopropane': 'CycloPropane',
+    'cyclopentane': 'Cyclopentane',
+    'cyclohexane': 'CycloHexane',
+    'ammonia': 'Ammonia',
+    'neon': 'Neon',
+    'krypton': 'Krypton',
+    'xenon': 'Xenon',
+    'r134a': 'R134a',
+    'r22': 'R22',
+    'r410a': 'R410A',
+}
 
 
 class GasComponent(BaseModel):
@@ -88,20 +155,43 @@ class GasMixture(BaseModel):
     def validate_total(self, tolerance: float = 1e-4) -> None:
         """
         Validate that fractions sum to 100%.
-        
+
         Args:
             tolerance: Acceptable deviation from 100%
-            
+
         Raises:
             ValidationError: If sum is not 100% within tolerance
         """
         total = self.total_fraction
-        
+
         if abs(total - 100.0) > tolerance:
             raise ValidationError(
                 "Gaz Kompozisyonu",
                 f"Yüzdelerin toplamı 100 olmalıdır.  Mevcut toplam: {total:.4f}%"
             )
+
+    def normalize_fractions(self) -> "GasMixture":
+        """
+        Scale all fractions so they sum to exactly 100%.
+
+        Returns:
+            A new GasMixture with normalized fractions (original is unchanged).
+        
+        Raises:
+            ValidationError: If total is zero or negative (no valid fractions to scale).
+        """
+        total = self.total_fraction
+        if total <= 0:
+            raise ValidationError(
+                "Gaz Kompozisyonu",
+                "Toplam yüzde sıfır veya negatif olduğu için normalleştirme yapılamıyor."
+            )
+        scale = 100.0 / total
+        normalized = [
+            GasComponent(name=c.name, fraction=round(c.fraction * scale, 6))
+            for c in self.components
+        ]
+        return GasMixture(components=normalized, fraction_type=self.fraction_type)
     
     def get_decimal_fractions(self) -> List[float]:
         """Get fractions as decimal values (0-1 range)."""
@@ -132,83 +222,38 @@ class GasMixture(BaseModel):
     def _format_gas_name_for_coolprop(gas_name: str) -> str:
         """
         Format gas name for CoolProp compatibility.
-        
+
         Args:
             gas_name: Original gas name
-            
+
         Returns:
             CoolProp-compatible gas name
         """
-        # Remove spaces and convert to lowercase for matching
         clean_name = re.sub(r'\s+', '', gas_name.strip()).lower()
-        
-        # Mapping of common names to CoolProp names
-        name_mapping = {
-            'methane': 'Methane',
-            'ethane': 'Ethane',
-            'propane': 'n-Propane',
-            'npropane': 'n-Propane',
-            'n-propane': 'n-Propane',
-            'n-butane': 'n-Butane',
-            'nbutane': 'n-Butane',
-            'isobutane': 'IsoButane',
-            'iso-butane': 'IsoButane',
-            'nitrogen': 'Nitrogen',
-            'carbondioxide': 'CarbonDioxide',
-            'hydrogen': 'Hydrogen',
-            'oxygen': 'Oxygen',
-            'argon': 'Argon',
-            'helium': 'Helium',
-            'water': 'Water',
-            'air': 'Air',
-            'hydrogensulfide': 'HydrogenSulfide',
-            'hydrogen-sulfide': 'HydrogenSulfide',
-            'carbonmonoxide': 'CarbonMonoxide',
-            'carbonylsulfide': 'CarbonylSulfide',
-            'carbonyl-sulfide': 'CarbonylSulfide',
-            'sulfurdioxide': 'SulfurDioxide',
-            'sulfur-dioxide': 'SulfurDioxide',
-            'n-pentane': 'n-Pentane',
-            'npentane': 'n-Pentane',
-            'isopentane': 'Isopentane',
-            'neopentane': 'Neopentane',
-            'n-hexane': 'n-Hexane',
-            'nhexane': 'n-Hexane',
-            'isohexane': 'Isohexane',
-            'n-heptane': 'n-Heptane',
-            'nheptane': 'n-Heptane',
-            'n-octane': 'n-Octane',
-            'noctane': 'n-Octane',
-            'n-nonane': 'n-Nonane',
-            'nnonane': 'n-Nonane',
-            'n-decane': 'n-Decane',
-            'ndecane': 'n-Decane',
-            'n-undecane': 'n-Undecane',
-            'nundecane': 'n-Undecane',
-            'n-dodecane': 'n-Dodecane',
-            'ndodecane': 'n-Dodecane',
-            'ethylene': 'Ethylene',
-            'propylene': 'Propylene',
-            '1-butene': '1-Butene',
-            '1butene': '1-Butene',
-            'isobutene': 'IsoButene',
-            'cis-2-butene': 'cis-2-Butene',
-            'cis2butene': 'cis-2-Butene',
-            'trans-2-butene': 'trans-2-Butene',
-            'trans2butene': 'trans-2-Butene',
-            'cyclopropane': 'CycloPropane',
-            'cyclopentane': 'Cyclopentane',
-            'cyclohexane': 'CycloHexane',
-            'ammonia': 'Ammonia',
-            'neon': 'Neon',
-            'krypton': 'Krypton',
-            'xenon': 'Xenon',
-            'r134a': 'R134a',
-            'r22': 'R22',
-            'r410a': 'R410A'
-        }
-        
-        return name_mapping.get(clean_name, gas_name)
+        return COOLPROP_NAME_MAP.get(clean_name, GasMixture._fuzzy_match_gas_name(clean_name))
+
+    @staticmethod
+    def _fuzzy_match_gas_name(clean_name: str) -> str:
+        """
+        Attempt fuzzy-matched gas name when exact mapping is not found.
+
+        Uses difflib to find the closest known gas name. If no match
+        exceeds a similarity threshold, returns the original name as-is.
+
+        Args:
+            clean_name: Lowercase, space-removed input name.
+
+        Returns:
+            Fuzzy-matched CoolProp name, or original name if no good match.
+        """
+        ratios = [
+            (name, difflib.SequenceMatcher(None, clean_name, name).ratio())
+            for name in COOLPROP_NAME_MAP
+        ]
+        best = max(ratios, key=lambda x: x[1])
+        if best[1] >= 0.65:
+            return COOLPROP_NAME_MAP[best[0]]
+        return clean_name
     
     def check_heos_compatibility(self) -> List[str]:
         """

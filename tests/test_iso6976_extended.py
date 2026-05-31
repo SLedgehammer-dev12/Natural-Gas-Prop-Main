@@ -153,8 +153,12 @@ class TestIso6976EdgeCases:
         hhv, lhv = iso6976.calculate_iso6976_heating_values(mixture)
         assert hhv is None
 
-    def test_temperature_correction(self):
-        """T_ref far from 298.15 should scale the result."""
+    def test_temperature_correction_not_applied_to_mass_based(self):
+        """T_ref should NOT change mass-based HHV/LHV (ISO 6976:2016 §8.3).
+        
+        Mass-based calorific values are independent of reference temperature.
+        Temperature correction applies only to volume-based values.
+        """
         mixture = GasMixture(
             components=[GasComponent(name="Methane", fraction=100.0)],
             fraction_type="molar",
@@ -163,7 +167,9 @@ class TestIso6976EdgeCases:
         hhv_hot, _ = iso6976.calculate_iso6976_heating_values(
             mixture, T_ref=400.0
         )
-        assert hhv_hot != hhv_default
+        assert abs(hhv_hot - hhv_default) < 0.001, (
+            "Mass-based HHV should NOT change with T_ref"
+        )
 
     def test_compatibility_check_false(self):
         mixture = GasMixture(

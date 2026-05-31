@@ -122,6 +122,64 @@ ISO6976_DATA = {
         "lhv_vol": 21.910,
         "density_ideal": 1.5248,
     },
+    # Non-combustibles (zero HHV/LHV, density needed for mixture calc)
+    "Oxygen": {
+        "hhv_mass": 0.0,
+        "lhv_mass": 0.0,
+        "hhv_vol": 0.0,
+        "lhv_vol": 0.0,
+        "density_ideal": 1.3310,
+    },
+    "Argon": {
+        "hhv_mass": 0.0,
+        "lhv_mass": 0.0,
+        "hhv_vol": 0.0,
+        "lhv_vol": 0.0,
+        "density_ideal": 1.6617,
+    },
+    "Helium": {
+        "hhv_mass": 0.0,
+        "lhv_mass": 0.0,
+        "hhv_vol": 0.0,
+        "lhv_vol": 0.0,
+        "density_ideal": 0.1664,
+    },
+    "Water": {
+        "hhv_mass": 0.0,
+        "lhv_mass": 0.0,
+        "hhv_vol": 0.0,
+        "lhv_vol": 0.0,
+        "density_ideal": 0.8040,
+    },
+    "Air": {
+        "hhv_mass": 0.0,
+        "lhv_mass": 0.0,
+        "hhv_vol": 0.0,
+        "lhv_vol": 0.0,
+        "density_ideal": 1.2922,
+    },
+    # Missing combustibles
+    "Neopentane": {
+        "hhv_mass": 48.940,
+        "lhv_mass": 45.300,
+        "hhv_vol": 152.520,
+        "lhv_vol": 141.167,
+        "density_ideal": 3.1184,
+    },
+    "n-Nonane": {
+        "hhv_mass": 48.190,
+        "lhv_mass": 44.680,
+        "hhv_vol": 267.150,
+        "lhv_vol": 247.700,
+        "density_ideal": 5.4769,
+    },
+    "n-Decane": {
+        "hhv_mass": 48.100,
+        "lhv_mass": 44.600,
+        "hhv_vol": 297.050,
+        "lhv_vol": 275.150,
+        "density_ideal": 5.9323,
+    },
 }
 
 _COOLPROP_TO_ISO = {
@@ -141,6 +199,14 @@ _COOLPROP_TO_ISO = {
     "hydrogen": "Hydrogen",
     "carbonmonoxide": "CarbonMonoxide",
     "hydrogensulfide": "HydrogenSulfide",
+    "oxygen": "Oxygen",
+    "argon": "Argon",
+    "helium": "Helium",
+    "water": "Water",
+    "air": "Air",
+    "neopentane": "Neopentane",
+    "n-nonane": "n-Nonane",
+    "n-decane": "n-Decane",
 }
 
 
@@ -197,11 +263,10 @@ def calculate_iso6976_heating_values(
     if hhv_total < 1e-6:
         return 0.0, 0.0
 
-    if abs(T_ref - 298.15) > 5.0:
-        ratio = T_ref / 298.15
-        hhv_total *= ratio
-        lhv_total *= ratio
-
+    # Note: Mass-based calorific values are independent of reference temperature
+    # per ISO 6976:2016 §8.3. The temperature correction applies only to
+    # volume-based calorific values. Mass-based HHV/LHV = standard enthalpy
+    # of combustion, a thermodynamic state function independent of T_ref.
     return hhv_total, lhv_total
 
 

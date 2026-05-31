@@ -6,6 +6,7 @@ Provides JSON-based save/load functionality for gas composition and calculation 
 
 import json
 import os
+import tempfile
 from typing import Dict, Any, Optional
 from pathlib import Path
 import logging
@@ -27,31 +28,46 @@ class DataSerializationError(Exception):
 
 def save_inputs_to_file(data: Dict[str, Any], filepath: str) -> None:
     """
-    Save user inputs to a JSON file.
-    
+    Save user inputs to a JSON file using an atomic write pattern.
+
+    A temporary file is written first, then atomically renamed to the target
+    path so that partial writes never corrupt an existing file.
+
     Args:
         data: Dictionary containing user inputs
         filepath: Path to save the file
-        
+
     Raises:
         DataSerializationError: If save fails
     """
     try:
-        # Add schema version
-        save_data = {
-            "version": SCHEMA_VERSION,
-            **data
-        }
-        
-        # Ensure .ngp extension
         if not filepath.endswith(FILE_EXTENSION):
             filepath += FILE_EXTENSION
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(save_data, f, indent=2, ensure_ascii=False)
-        
+
+        save_data = {
+            **data,
+            "version": SCHEMA_VERSION,
+        }
+
+        dir_path = os.path.dirname(filepath) or os.getcwd()
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=".tmp",
+            prefix="ngp_",
+            dir=dir_path,
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(save_data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, filepath)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
         logger.info(f"Data saved to {filepath}")
-        
+
+    except DataSerializationError:
+        raise
     except Exception as e:
         logger.error(f"Failed to save data: {e}")
         raise DataSerializationError(f"Kaydetme hatası: {e}")
@@ -79,7 +95,10 @@ def load_inputs_from_file(filepath: str) -> Dict[str, Any]:
         file_major = file_version.split(".")[0]
         our_major = SCHEMA_VERSION.split(".")[0]
         if file_major != our_major:
-            logger.warning(f"Schema version mismatch: file={file_version}, app={SCHEMA_VERSION}")
+            raise DataSerializationError(
+                f"Dosya şeması ({file_version}) bu uygulama ({SCHEMA_VERSION}) ile uyumlu değil. "
+                f"Lütfen dosyayı güncel sürüm ile yeniden kaydedin."
+            )
         
         logger.info(f"Data loaded from {filepath}")
         return data

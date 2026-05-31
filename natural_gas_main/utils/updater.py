@@ -7,6 +7,7 @@ Handles checking for updates from remote GitHub repository.
 import json
 import logging
 import urllib.request
+import urllib.parse
 import webbrowser
 from typing import Tuple, Optional, Dict, Any
 from packaging import version
@@ -62,10 +63,21 @@ class UpdateChecker:
             self.logger.error(msg, exc_info=True)
             return False, None, msg
 
+    @staticmethod
+    def _validate_url(url: str) -> bool:
+        """Validate that a URL points to GitHub (defense-in-depth)."""
+        if not url:
+            return False
+        try:
+            parsed = urllib.parse.urlparse(url)
+            return parsed.netloc in ("github.com", "www.github.com")
+        except Exception:
+            return False
+
     def open_download_page(self, url: str = None):
         """Open the download/repo page in browser (only allows GitHub URLs)."""
         target_url = url or config.REPO_URL
-        if target_url and not target_url.startswith("https://github.com/"):
+        if target_url and not self._validate_url(target_url):
             self.logger.warning(f"Blocked non-GitHub URL: {target_url}")
             target_url = config.REPO_URL
         webbrowser.open(target_url)

@@ -386,7 +386,12 @@ class InputPanel(ctk.CTkFrame):
             return
 
         # Calculate remaining percentage for default value
-        current_total = sum(float(row['var'].get()) for row in self.comp_rows.values() if row['var'].get())
+        current_total = 0.0
+        for row in self.comp_rows.values():
+            try:
+                current_total += float(row['var'].get())
+            except ValueError:
+                pass
         remaining = max(0.0, 100.0 - current_total)
         default_val = f"{remaining:.4f}" if remaining > 0 else "0.0000"
         
@@ -505,7 +510,7 @@ class InputPanel(ctk.CTkFrame):
                 startangle=90, textprops={'fontsize': 8}
             )
             for text in texts: text.set_color(text_color)
-            for autotext in autotexts: autotext.set_color("black")
+            for autotext in autotexts: autotext.set_color(text_color)
         else:
             # Empty state
             wedges, texts = self.pie_ax.pie([1], labels=["Bileşen Yok"], colors=[bg_col])
