@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.5.1",
+  "version": "v1.5.2",
   "date": "2026-05-31",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.5.1",
-  "changelog": "- Kritik: HEOS/SRK backend secimi ters mantik duzeltildi.\n- Kritik: Sutton Tpc birim donusumu (°R->K) ~255K sapma giderildi.\n- Kritik: aga8_calculator.py UnboundLocalError logger oncesi cagri.\n- H2S isil deger %7.6 hata duzeltmesi (ISO 6976:2016 uyumlu).\n- ISO 6976:2016 modulu: 8 yeni bilesen (O2, Ar, He, H2O, Air, Neopentane, n-Nonan, n-Dekan).\n- Kutle-bazli sicaklik duzeltmesi ISO 6976:2016 8.3'e gore kaldirildi.\n- Atomik dosya yazma (tempfile + os.replace) veri kaybi onlemi.\n- Thread guvenligi: _calc_lock ile yaris kosulu engellendi.\n- CoolProp log gurultusu debug_level=0 ile susturuldu.\n- PDF footer macOS Helvetica.dfont yolu, sol/sag hizalama.\n- Fraksiyon normalizasyonu: normalize_fractions() metodu.\n- Gaz adi fuzzy esleme: difflib ile (orn. Butane->n-Butane).\n- Cricondenbar T faz zarfina eklendi.\n- Pie chart dark mode renk duzeltmesi.\n- Sema versiyon zorunlulugu: uyumsuz .ngp dosyalari reddedilir.\n- URL validasyonu: urllib.parse ile netloc kontrolu.\n- __main__.py eklendi (python -m dogal gaz destegi).\n- Test: 319 test, %76 coverage."
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.5.2",
+  "changelog": "- Kapsamli Test Coverage: %73→%95 (545 test, 11 modul >=%92).\n- Test Asama 1 (Kolay): 5 modul %100 coverage.\n- Test Asama 2 (Orta): converters, z_factor, iso6976, preferences, gas_data mock testleri.\n- Test Asama 3 (Zor): logger (%18→%98), updater (%40→%96), aga8_calculator (%79→%96).\n- Test Asama 4 (Detayli): calculator (%76→%93) FakeAbstractState ile.\n- report_generator: %80→%92 (font fallback, log, PDF hata yonetimi).\n- Tum modullerde edge case ve exception yolu testleri."
 }

@@ -112,11 +112,11 @@ def show_about_dialog() -> None:
     """Show application about information."""
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.5.1 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.5.2 - Profesyonel Sürüm\n\n"
         "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
         "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.5.1 sürümü: Kritik hata düzeltmeleri ve hesaplama doğruluğu iyileştirmeleri,\n"
-        "Sutton korelasyonu, kritik düzeltmeler ve 278 test.\n\n"
+        "v1.5.2 sürümü: Kapsamlı test coverage iyileştirmeleri (%73→%95),\n"
+        "545 test, 11 modül ≥%92 coverage.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -157,7 +157,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     # Create custom window
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.5.1")
+    dialog.title("Yenilikler - Sürüm v1.5.2")
     dialog.geometry("620x600")
     dialog.resizable(False, False)
     
@@ -174,7 +174,18 @@ def show_new_features_info() -> None:
     ).pack(pady=(0, 20))
     
     info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.5.1):\n"
+        "🌟 YENİ ÖZELLİKLER (v1.5.2):\n"
+        "• Kapsamlı Test Coverage: %73→%95 (545 test, 11 modül ≥%92).\n"
+        "• Test Aşama 1 (Kolay): exceptions.py, heating_value_db.py, result_unit_converter.py,\n"
+        "  settings.py, calculation_result.py → %100 coverage.\n"
+        "• Test Aşama 2 (Orta): converters.py, z_factor.py, iso6976.py, preferences.py,\n"
+        "  gas_data.py → mock ile edge case testleri.\n"
+        "• Test Aşama 3 (Zor): logger.py (%18→%98), updater.py (%40→%96),\n"
+        "  aga8_calculator.py (%79→%96) — dosya/HTTP/font mock.\n"
+        "• Test Aşama 4 (Detaylı): calculator.py (%76→%93) — FakeAbstractState ile.\n"
+        "• report_generator.py: %80→%92 — font fallback, log okuma, PDF hata yönetimi.\n"
+        "• Tüm modüllerde edge case ve exception yolu testleri.\n\n"
+        "🌟 ÖNCEKİ ÖZELLİKLER (v1.5.1):\n"
         "• Kritik Hata Düzeltmeleri: HEOS/SRK backend seçimi ters mantık düzeltildi.\n"
         "• Sutton Sıcaklık Dönüşümü: °R→K dönüşüm hatası giderildi (~255K sapma).\n"
         "• H₂S Isıl Değer: %7.6 hata düzeltildi (ISO 6976:2016 uyumlu).\n"
