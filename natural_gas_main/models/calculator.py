@@ -266,9 +266,12 @@ class ThermoCalculator:
         Returns:
             Ordered list of backend names
         """
-        backends = [preferred]
+        if self._is_neqsim_backend(preferred) and not NEQSIM_AVAILABLE:
+            backends = ["GERG-2008"]
+        else:
+            backends = [preferred]
 
-        is_neqsim_preferred = self._is_neqsim_backend(preferred)
+        is_neqsim_preferred = self._is_neqsim_backend(preferred) and NEQSIM_AVAILABLE
 
         heos_incompatible = mixture.check_heos_compatibility()
         if heos_incompatible and preferred == "HEOS":

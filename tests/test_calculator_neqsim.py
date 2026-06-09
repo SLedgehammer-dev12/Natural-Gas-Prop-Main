@@ -210,7 +210,8 @@ class TestThermoCalculatorNeqSimFallbackOrder:
         with patch.object(calc, '_has_non_aga8_components', return_value=False):
             with patch("natural_gas_main.models.gas_data.GasMixture.check_heos_compatibility",
                        return_value=False):
-                order = calc._get_backend_order(simple_mixture, "neqsim-srk")
+                with patch("natural_gas_main.models.calculator.NEQSIM_AVAILABLE", True):
+                    order = calc._get_backend_order(simple_mixture, "neqsim-srk")
 
         assert order[0] == "neqsim-srk"
         neqsim_in_order = [b for b in order if b.startswith("neqsim-")]
@@ -225,6 +226,20 @@ class TestThermoCalculatorNeqSimFallbackOrder:
                        return_value=False):
                 order = calc._get_backend_order(simple_mixture, "HEOS")
 
+        neqsim_in_order = [b for b in order if b.startswith("neqsim-")]
+        assert len(neqsim_in_order) == 0
+
+    def test_neqsim_unavailable_starts_with_gerg2008(self, simple_mixture):
+        from natural_gas_main.models.calculator import ThermoCalculator
+
+        calc = ThermoCalculator()
+        with patch.object(calc, '_has_non_aga8_components', return_value=False):
+            with patch("natural_gas_main.models.gas_data.GasMixture.check_heos_compatibility",
+                       return_value=False):
+                with patch("natural_gas_main.models.calculator.NEQSIM_AVAILABLE", False):
+                    order = calc._get_backend_order(simple_mixture, "neqsim-srk")
+
+        assert order[0] == "GERG-2008"
         neqsim_in_order = [b for b in order if b.startswith("neqsim-")]
         assert len(neqsim_in_order) == 0
 
