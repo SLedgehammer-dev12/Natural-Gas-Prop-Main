@@ -9,7 +9,7 @@ customtkinter_path = pathlib.Path(customtkinter.__file__).parent
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
-_version_info_path = pathlib.Path(__file__).parent / "version_info.txt"
+_version_info_path = pathlib.Path("version_info.txt")
 if _version_info_path.exists():
     _vtext = _version_info_path.read_text(encoding="utf-8")
     _m = re.search(r"FileVersion',\s*'([^']+)'", _vtext)
