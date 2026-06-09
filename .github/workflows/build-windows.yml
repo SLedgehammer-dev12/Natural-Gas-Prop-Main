@@ -25,24 +25,7 @@ jobs:
           echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
           echo "Tag version: $tag"
 
-      - name: Update version.json
-        run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          $date = (Get-Date -Format "yyyy-MM-dd")
-          $json = Get-Content version.json -Raw | ConvertFrom-Json
-          $json.version = $version
-          $json.date = $date
-          $json.download_url = "https://github.com/${{ github.repository }}/releases/tag/$version"
-          $json | ConvertTo-Json -Depth 10 | Set-Content version.json -Encoding UTF8
-          Write-Output "Updated version.json: version=$version, date=$date"
 
-      - name: Commit and push version.json
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.json
-          git commit -m "chore: update version.json to ${{ steps.get_version.outputs.VERSION }}"
-          git push
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
