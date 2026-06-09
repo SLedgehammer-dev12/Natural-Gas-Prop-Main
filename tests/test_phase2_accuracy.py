@@ -206,14 +206,14 @@ class TestISO6976MissingComponents:
 class TestAGA8Normalization:
     """Verify AGA8 normalization improvements."""
 
-    def test_aga8_normalization_warning_contains_fractions(self):
-        """Normalization warning should mention fraction redistribution."""
+    def test_aga8_normalization_raises_on_unmapped(self):
+        """AGA8 should raise ValueError with fallback message when unmapped gases exist."""
         from natural_gas_main.models import aga8_calculator
         import inspect
 
         source = inspect.getsource(aga8_calculator)
-        assert "oransal olarak dağıtılacak" in source, (
-            "Warning should explain fraction redistribution"
+        assert "HEOS/SRK/PR yöntemine geçiliyor" in source, (
+            "Should mention fallback to HEOS/SRK/PR"
         )
 
     def test_aga8_method_validation(self):

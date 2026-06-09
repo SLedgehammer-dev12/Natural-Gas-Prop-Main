@@ -15,6 +15,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from natural_gas_main.models.gas_data import GasComponent, GasMixture
+from natural_gas_main.models.neqsim_calculator import NEQSIM_EOS_REGISTRY
 from natural_gas_main.core.exceptions import ValidationError
 from natural_gas_main.core import validators
 from natural_gas_main.core import converters
@@ -335,9 +336,22 @@ class InputPanel(ctk.CTkFrame):
             variable=self.method,
             values=methods,
             state="readonly",
-            width=175
+            width=220
         )
         self.method_combo.grid(row=2, column=1, columnspan=2, padx=(0, 10), pady=(0, 10), sticky="w")
+        
+        # Backend info label (shows EOS description)
+        self.backend_info_label = ctk.CTkLabel(
+            volume_frame,
+            text="",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        self.backend_info_label.grid(row=3, column=1, columnspan=2, padx=(0, 10), pady=(0, 5), sticky="w")
+        
+        # Trace backend selection to show description
+        self.method.trace_add("write", self._on_backend_change)
+        self._on_backend_change()
 
     def _get_filtered_gas_list(self):
         """Return the gas list based on the filter switch."""
@@ -684,6 +698,25 @@ class InputPanel(ctk.CTkFrame):
             backend: Backend name to set
         """
         self.method.set(backend)
+    
+    def _on_backend_change(self, *args):
+        """Update backend info label when selection changes."""
+        backend = self.method.get()
+        if backend in NEQSIM_EOS_REGISTRY:
+            info = NEQSIM_EOS_REGISTRY[backend]
+            self.backend_info_label.configure(
+                text=f"[{info['group']}] {info['desc']}"
+            )
+        else:
+            groups = {
+                "GERG-2008": "AGA8 (pyaga8)",
+                "AGA8-Detail": "AGA8 (pyaga8)",
+                "HEOS": "CoolProp Helmholtz",
+                "SRK": "CoolProp SRK",
+                "PR": "CoolProp PR",
+            }
+            group = groups.get(backend, "CoolProp/AGA8")
+            self.backend_info_label.configure(text=f"[{group}]")
     
     def get_all_inputs(self) -> dict:
         """

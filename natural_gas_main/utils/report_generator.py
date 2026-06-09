@@ -244,7 +244,8 @@ class ReportGenerator:
                     'Creating state',
                     'Backend',
                     'Heating',
-                    'calculation'
+                    'calculation',
+                    'NeqSim'
                 ]
                 filtered_lines = [
                     line.strip() for line in recent_lines

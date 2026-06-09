@@ -158,7 +158,7 @@ class OutputPanel(ctk.CTkFrame):
         comp_frame.pack(fill=tk.X, pady=(10, 0))
         ctk.CTkLabel(comp_frame, text="Yöntem Karşılaştırması (Z-Faktörü ve Temel Değerler)", font=ctk.CTkFont(weight="bold")).pack(anchor="w")
         
-        comp_cols = ("Özellik", "Birim", "GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR", "Katz", "DAK")
+        comp_cols = ("Özellik", "Birim", "NQ-GERG", "NQ-SRK", "NQ-PR", "NQ-CPA", "GERG", "AGA8", "HEOS", "SRK", "PR", "Katz", "DAK")
         self.comp_tree = ttk.Treeview(
             results_tab,
             columns=comp_cols,
@@ -169,11 +169,11 @@ class OutputPanel(ctk.CTkFrame):
         for col in comp_cols:
             self.comp_tree.heading(col, text=col)
             if col == "Özellik":
-                self.comp_tree.column(col, width=150, minwidth=100)
+                self.comp_tree.column(col, width=130, minwidth=100)
             elif col == "Birim":
-                self.comp_tree.column(col, width=60, minwidth=40)
+                self.comp_tree.column(col, width=50, minwidth=40)
             else:
-                self.comp_tree.column(col, width=90, minwidth=60)
+                self.comp_tree.column(col, width=70, minwidth=50)
                 
         comp_scrollbar = ttk.Scrollbar(
             results_tab,
@@ -468,13 +468,17 @@ class OutputPanel(ctk.CTkFrame):
         # Populate Comparison Tree
         if hasattr(self, 'comp_tree') and result.z_factor_comparison:
             comp_methods = [
-                ("GERG-2008", "GERG-2008"), 
-                ("AGA8-Detail", "AGA8-Detail"), 
-                ("HEOS", "HEOS"), 
-                ("SRK", "SRK"), 
-                ("PR", "PR"), 
-                ("Katz", "Standing-Katz ANN10"), 
-                ("DAK", "Dranchuk-Abou-Kassem")
+                ("neqsim-gerg2008", "NeqSim GERG-2008"),
+                ("neqsim-srk", "NeqSim SRK"),
+                ("neqsim-pr", "NeqSim PR"),
+                ("neqsim-srk-cpa", "NeqSim CPA"),
+                ("GERG-2008", "GERG-2008"),
+                ("AGA8-Detail", "AGA8-Detail"),
+                ("HEOS", "HEOS"),
+                ("SRK", "SRK"),
+                ("PR", "PR"),
+                ("Katz", "Standing-Katz ANN10"),
+                ("DAK", "Dranchuk-Abou-Kassem"),
             ]
             comp_map = {c.method: c for c in result.z_factor_comparison}
             
@@ -600,8 +604,8 @@ class OutputPanel(ctk.CTkFrame):
                 return
             self.comp_tree.column("Özellik", width=int(avail_c * 0.20))
             self.comp_tree.column("Birim", width=int(avail_c * 0.09))
-            method_w = int(avail_c * 0.71 / 7)
-            for col in ("GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR", "Katz", "DAK"):
+            method_w = int(avail_c * 0.71 / 11)
+            for col in ("NQ-GERG", "NQ-SRK", "NQ-PR", "NQ-CPA", "GERG", "AGA8", "HEOS", "SRK", "PR", "Katz", "DAK"):
                 self.comp_tree.column(col, width=method_w)
         except tk.TclError:
             pass

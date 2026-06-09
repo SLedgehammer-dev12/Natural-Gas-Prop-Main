@@ -22,12 +22,19 @@ def test_physical_constants_not_rewritten():
 
 def test_version_json_matches_code():
     """version.json version matches the codebase."""
+
+    # -- coverage: this test needs to know the expected ver
+    import tomllib
+    with open(ROOT / "pyproject.toml", "rb") as f:
+        pyproject = tomllib.load(f)
+    expected = f"v{pyproject['project']['version']}"
+
     with open(ROOT / "version.json", encoding="utf-8") as f:
         version_data = json.load(f)
 
     assert version_data["product"] == "Natural Gas Prop Main"
-    assert version_data["version"] == config.APP_VERSION
-    assert version_data["download_url"].endswith(f"/releases/tag/{config.APP_VERSION}")
+    assert version_data["version"] == expected
+    assert version_data["download_url"].endswith(f"/releases/tag/{expected}")
 
 
 def test_pyproject_version_matches_code():

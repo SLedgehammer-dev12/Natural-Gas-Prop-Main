@@ -29,8 +29,16 @@ from natural_gas_main.models.calculation_result import (
 )
 from natural_gas_main.models.heating_value_db import get_reference_heating_values
 from natural_gas_main.models.z_factor import StandingKatzZFactor
-from natural_gas_main.models.aga8_calculator import calculate_aga8, PYAGA8_AVAILABLE
+from natural_gas_main.models.aga8_calculator import calculate_aga8, PYAGA8_AVAILABLE, AGA8_MAPPING
 from natural_gas_main.models.iso6976 import calculate_iso6976_heating_values, is_iso6976_compatible
+from natural_gas_main.models.neqsim_calculator import (
+    calculate_neqsim,
+    NEQSIM_AVAILABLE,
+    NEQSIM_AVAILABLE_BACKENDS,
+    NEQSIM_EOS_REGISTRY,
+    get_neqsim_iso6976,
+    get_neqsim_hydrate_temperature,
+)
 
 CP = None
 COOLPROP_AVAILABLE = False
@@ -223,9 +231,30 @@ class ThermoCalculator:
                     f"HEOS incompatible gases: {incompatible}. "
                     "Consider using SRK or PR."
                 )
-        
+
+        if self._is_neqsim_backend(requested_backend):
+            if not NEQSIM_AVAILABLE:
+                self.logger.warning(
+                    f"NeqSim backend '{requested_backend}' is not available "
+                    "(neqsim package not installed). Falling back."
+                )
+
         return requested_backend
     
+    @staticmethod
+    def _is_neqsim_backend(backend: str) -> bool:
+        """Check if a backend name is a NeqSim EOS."""
+        return backend.startswith("neqsim-")
+
+    @staticmethod
+    def _has_non_aga8_components(mixture: GasMixture) -> bool:
+        """Check if mixture contains components not supported by AGA8 standard."""
+        for gas in mixture.components:
+            coolprop_name = GasMixture._format_gas_name_for_coolprop(gas.name).lower()
+            if coolprop_name not in AGA8_MAPPING:
+                return True
+        return False
+
     def _get_backend_order(self, mixture: GasMixture, preferred: str) -> List[str]:
         """
         Get prioritized list of backends to try.
@@ -238,20 +267,53 @@ class ThermoCalculator:
             Ordered list of backend names
         """
         backends = [preferred]
-        
-        # Check compatibility
+
+        is_neqsim_preferred = self._is_neqsim_backend(preferred)
+
         heos_incompatible = mixture.check_heos_compatibility()
         if heos_incompatible and preferred == "HEOS":
             backends = []
-            
-        # Add fallbacks in order of preference
-        all_fallbacks = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
-        for fallback in all_fallbacks:
-            if fallback == "HEOS" and heos_incompatible:
-                continue
-            if fallback not in backends:
-                backends.append(fallback)
-        
+
+        non_aga8 = self._has_non_aga8_components(mixture)
+        if non_aga8:
+            self.logger.info(
+                "Non-AGA8 bileşenler tespit edildi, GERG-2008/AGA8-Detail atlanıyor."
+            )
+
+        if is_neqsim_preferred:
+            # If NeqSim is preferred, fallback through other NeqSim EOS first,
+            # then CoolProp/AGA8, then Z-only
+            neqsim_fallbacks = [
+                b for b in NEQSIM_AVAILABLE_BACKENDS
+                if b != preferred
+            ]
+            legacy_fallbacks = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
+
+            for fb in neqsim_fallbacks:
+                if fb not in backends:
+                    backends.append(fb)
+            for fb in legacy_fallbacks:
+                if fb == "HEOS" and heos_incompatible:
+                    continue
+                if fb in ("GERG-2008", "AGA8-Detail") and non_aga8:
+                    continue
+                if fb not in backends:
+                    backends.append(fb)
+        else:
+            non_aga8 = self._has_non_aga8_components(mixture)
+            if non_aga8:
+                self.logger.info(
+                    "Non-AGA8 bileşenler tespit edildi, GERG-2008/AGA8-Detail atlanıyor."
+                )
+            all_fallbacks = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
+            for fb in all_fallbacks:
+                if fb == "HEOS" and heos_incompatible:
+                    continue
+                if fb in ("GERG-2008", "AGA8-Detail") and non_aga8:
+                    continue
+                if fb not in backends:
+                    backends.append(fb)
+
         return backends
 
     def _calculate_z_factor_comparison(
@@ -319,6 +381,26 @@ class ThermoCalculator:
                 ))
             except Exception as e:
                 self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
+
+        # 2.5 Add NeqSim backends for comparison
+        for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
+            if self._is_neqsim_backend(main_backend or "") and method == main_backend:
+                continue
+            try:
+                res, _ = calculate_neqsim(mixture, temperature_k, pressure_pa, method)
+                comparisons.append(ZFactorComparison(
+                    method=method,
+                    z_factor=res.compressibility_factor,
+                    density=res.density,
+                    molar_mass=res.molar_mass,
+                    enthalpy=res.enthalpy,
+                    entropy=res.entropy,
+                    cp=res.cp,
+                    cv=res.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                ))
+            except Exception as e:
+                self.logger.debug(f"NeqSim {method} comparison unavailable: {e}")
 
         # 3. Add HEOS, SRK, PR — reuse main result when available
         for method in ["HEOS", "SRK", "PR"]:
@@ -503,8 +585,12 @@ class ThermoCalculator:
     ) -> CalculationResult:
         """Perform calculation with specific backend and package results."""
 
-        # Dispatch to backend-specific logic
-        if backend in ["GERG-2008", "AGA8-Detail"]:
+        if self._is_neqsim_backend(backend):
+            return self._compute_neqsim(
+                mixture, temperature_k, pressure_pa, volume_m3, backend,
+                standard_T, standard_P, standard_name
+            )
+        elif backend in ["GERG-2008", "AGA8-Detail"]:
             actual_results, standard_results, phase_envelope = self._compute_aga8(
                 mixture, temperature_k, pressure_pa, backend,
                 standard_T, standard_P, standard_name
@@ -571,6 +657,47 @@ class ThermoCalculator:
         phase_envelope = self._calculate_phase_envelope(state, backend)
         return actual_results, standard_results, phase_envelope
 
+    def _compute_neqsim(
+        self, mixture, temperature_k, pressure_pa, volume_m3,
+        backend, standard_T, standard_P, standard_name
+    ):
+        """Full calculation using NeqSim backend (actual + standard + transport)."""
+        if not NEQSIM_AVAILABLE:
+            raise BackendNotAvailableError(backend)
+
+        actual_results, transport = calculate_neqsim(
+            mixture, temperature_k, pressure_pa, backend
+        )
+
+        standard_results = StandardConditionResults(
+            density_std=None,
+            specific_gravity=None,
+            reference_temperature=standard_T,
+            reference_pressure=standard_P,
+            standard_name=standard_name
+        )
+
+        try:
+            std_actual, _ = calculate_neqsim(mixture, standard_T, standard_P, backend)
+            standard_results.density_std = std_actual.density
+            try:
+                rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
+            except Exception:
+                rho_air = standard_P / (287.058 * standard_T)
+            standard_results.specific_gravity = std_actual.density / rho_air
+        except Exception as e:
+            self.logger.warning(f"NeqSim standard condition failed with {backend}: {e}")
+
+        result = self._finalize_result(
+            mixture, actual_results, standard_results, None,
+            temperature_k, pressure_pa, volume_m3, backend,
+            standard_T, standard_P
+        )
+
+        result.transport = transport
+
+        return result
+
     def _finalize_result(
         self, mixture, actual_results, standard_results, phase_envelope,
         temperature_k, pressure_pa, volume_m3, backend,
@@ -598,7 +725,7 @@ class ThermoCalculator:
                 volume_m3, actual_results.density, rho_std, mixture, cp_backend
             )
         hydrate_results = self._calculate_hydrate_formation(
-            temperature_k, pressure_pa, sg
+            temperature_k, pressure_pa, sg, mixture, backend
         )
         result = CalculationResult(
             backend_used=backend,
@@ -619,7 +746,9 @@ class ThermoCalculator:
         self,
         temperature_k: float,
         pressure_pa: float,
-        specific_gravity: Optional[float]
+        specific_gravity: Optional[float],
+        mixture: Optional[GasMixture] = None,
+        backend: Optional[str] = None,
     ) -> Optional[HydrateResults]:
         """Calculate gas hydrate formation temperature.
 
@@ -627,6 +756,8 @@ class ThermoCalculator:
             temperature_k: Operating temperature in Kelvin
             pressure_pa: Operating pressure in Pascals
             specific_gravity: Gas specific gravity (dimensionless)
+            mixture: Gas mixture (for NeqSim CPA-based calculation)
+            backend: Backend used (to check if NeqSim available)
 
         Returns:
             HydrateResults object or None if calculation fails
@@ -675,8 +806,19 @@ class ThermoCalculator:
             t_k_motiee = (t_f_motiee - 32) * 5 / 9 + 273.15
             t_k_towler_mokhatab = (t_f_towler_mokhatab - 32) * 5 / 9 + 273.15
 
-            # Average of predicted temperatures
-            t_k_average = (t_k_hammerschmidt + t_k_motiee + t_k_towler_mokhatab) / 3.0
+            # 4. NeqSim CPA-based hydrate (if available)
+            t_k_neqsim = None
+            if NEQSIM_AVAILABLE and mixture is not None:
+                try:
+                    t_k_neqsim = get_neqsim_hydrate_temperature(mixture, temperature_k, pressure_pa)
+                except Exception:
+                    pass
+
+            # Use NeqSim in average if available
+            temps = [t_k_hammerschmidt, t_k_motiee, t_k_towler_mokhatab]
+            if t_k_neqsim is not None and not math.isnan(t_k_neqsim):
+                temps.append(t_k_neqsim)
+            t_k_average = sum(temps) / len(temps)
 
             # Hydrate formation risk assessment
             risk_hammerschmidt = temperature_k <= t_k_hammerschmidt
@@ -909,7 +1051,7 @@ class ThermoCalculator:
         T_ref: float,
         P_ref: float
     ) -> Optional[HeatingValues]:
-        """Calculate heating values with 3-stage fallback.
+        """Calculate heating values with multi-stage fallback.
 
         Args:
             mixture: Gas mixture
@@ -928,8 +1070,28 @@ class ThermoCalculator:
             )
             return None
 
+        # Stage 0: NeqSim ISO 6976 (for NeqSim backends or generally)
+        if NEQSIM_AVAILABLE:
+            try:
+                iso_data = get_neqsim_iso6976(mixture, T_ref)
+                if iso_data is not None and iso_data.get("gcv_kj_m3", 0) > 0:
+                    hhv_vol = iso_data["gcv_kj_m3"] / 1000.0
+                    lhv_vol = iso_data["lcv_kj_m3"] / 1000.0
+                    wobbe = iso_data.get("wobbe_kj_m3", 0) / 1000.0
+                    hhv_mass = hhv_vol / rho_std if rho_std > 0 else 0.0
+                    lhv_mass = lhv_vol / rho_std if rho_std > 0 else 0.0
+                    if hhv_mass > 0 and lhv_mass > 0:
+                        self.logger.info("Using NeqSim ISO 6976 heating values")
+                        return self._package_heating_values(
+                            hhv_mass, lhv_mass, rho_std, sg, "NeqSim ISO 6976"
+                        )
+            except Exception as e:
+                self.logger.info(f"NeqSim ISO 6976 unavailable: {e}")
+
         # CoolProp API requires CoolProp backends
         if backend in ["GERG-2008", "AGA8-Detail"]:
+            backend = "SRK" if mixture.check_heos_compatibility() else "HEOS"
+        if self._is_neqsim_backend(backend):
             backend = "SRK" if mixture.check_heos_compatibility() else "HEOS"
 
         # Try Stage 1: Built-in method (HEOS only)

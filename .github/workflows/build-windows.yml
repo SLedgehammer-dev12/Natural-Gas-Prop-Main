@@ -15,6 +15,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          $tag = "${{ github.ref_name }}"
+          echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
+          echo "Tag version: $tag"
+
+      - name: Update version.json
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $date = (Get-Date -Format "yyyy-MM-dd")
+          $json = Get-Content version.json -Raw | ConvertFrom-Json
+          $json.version = $version
+          $json.date = $date
+          $json.download_url = "https://github.com/${{ github.repository }}/releases/tag/$version"
+          $json | ConvertTo-Json -Depth 10 | Set-Content version.json -Encoding UTF8
+          Write-Output "Updated version.json: version=$version, date=$date"
+
+      - name: Commit and push version.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore: update version.json to ${{ steps.get_version.outputs.VERSION }}"
+          git push
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -30,9 +58,9 @@ jobs:
       - name: Build Windows EXE
         run: |
           pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
-          dir dist\
+          Get-ChildItem dist\*.exe | ForEach-Object { Write-Output "Built: $($_.Name)" }
 
       - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Natural Gas Prop Main.exe
+          files: dist/*.exe

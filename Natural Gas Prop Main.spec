@@ -2,9 +2,25 @@
 
 import pathlib
 import sys
+import re
 import customtkinter
 
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
+
+# Read version from version_info.txt for output naming
+_version = "unknown"
+_version_info_path = pathlib.Path(__file__).parent / "version_info.txt"
+if _version_info_path.exists():
+    _vtext = _version_info_path.read_text(encoding="utf-8")
+    _m = re.search(r"FileVersion',\s*'([^']+)'", _vtext)
+    if _m:
+        _version = _m.group(1)
+    else:
+        _m = re.search(r"filevers=\((\d+),\s*(\d+),\s*(\d+)", _vtext)
+        if _m:
+            _version = f"v{_m.group(1)}.{_m.group(2)}.{_m.group(3)}"
+
+_exe_name = f"Natural Gas Prop Main {_version}" if _version != "unknown" else "Natural Gas Prop Main"
 
 a = Analysis(
     ['run_app.py'],
@@ -19,6 +35,7 @@ a = Analysis(
         'pyaga8',
         'customtkinter',
         'packaging',
+        'neqsim',
     ],
     hookspath=[],
     hooksconfig={},
@@ -36,7 +53,7 @@ if sys.platform == 'darwin':
         a.scripts,
         [],
         exclude_binaries=True,
-        name='Natural Gas Prop Main',
+        name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -57,17 +74,17 @@ if sys.platform == 'darwin':
         strip=False,
         upx=False,
         upx_exclude=[],
-        name='Natural Gas Prop Main',
+        name=_exe_name,
     )
     app = BUNDLE(
         coll,
-        name='Natural Gas Prop Main.app',
+        name=f'{_exe_name}.app',
         icon=None,
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.5.2',
-            'CFBundleVersion': '1.5.2.0',
+            'CFBundleShortVersionString': '1.6.0',
+            'CFBundleVersion': '1.6.0.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
@@ -81,7 +98,7 @@ else:
         a.binaries,
         a.datas,
         [],
-        name='Natural Gas Prop Main',
+        name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,

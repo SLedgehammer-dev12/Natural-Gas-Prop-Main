@@ -1,3 +1,72 @@
+# Natural Gas Prop Main v1.6.0
+
+**Tarih:** Haziran 2026
+
+## Yeni Özellikler
+
+### NeqSim Termodinamik Motor Entegrasyonu (15 Yeni EOS)
+Equinor'un açık kaynak NeqSim kütüphanesi entegre edildi. Artık CoolProp/pyaga8'ın yanında **15 farklı EOS** ile hesaplama yapılabilir.
+
+| Grup | EOS Modeli | Açıklama |
+|------|-----------|----------|
+| **SRK Ailesi** | SRK, SRK-Peneloux, SRK-MC, SRK-TwuCoon | Kübik EOS varyantları |
+| **PR Ailesi** | PR, PR-MC, PR-TwuCoon, PR-Danesh | Peng-Robinson varyantları |
+| **CPA** | SRK-CPA (Equinor) | Su-hidrokarbon VLE, hidrat, glikol dehidrasyon |
+| **Ekşi Gaz** | Søreide-Whitson | H₂S/CO₂ + tuzlu su sistemleri |
+| **Referans** | GERG-2008, GERG-2008-H₂, EOS-CG, Span-Wagner | ISO 20765-2, CCS, saf CO₂ |
+| **Tahminsel** | UMR-PRU | Etkileşim parametresi gerektirmez |
+
+### Transport Properties Desteği
+Viskozite (cP), termal iletkenlik (W/mK), Joule-Thomson katsayısı ve yüzey gerilimi artık hesaplanabiliyor ve UI/raporlarda gösteriliyor.
+
+### NeqSim ISO 6976 Isıl Değer Hesaplaması
+HHV/LHV/Wobbe hesabında CoolProp'tan önce NeqSim ISO 6976 standardı denecek (Stage 0). Başarısız olursa mevcut fallback zinciri çalışır.
+
+### NeqSim CPA-tabanlı Hidrat Tahmini
+Hammerschmidt/Motiee/Towler modellerine ek olarak NeqSim'in CPA-tabanlı van der Waals-Platteeuw hidrat modeli kullanılıyor (4. model).
+
+### Backend Bilgi Gösterimi
+UI'da seçilen EOS modeli hakkında kısa açıklama ve grup bilgisi gösteriliyor.
+
+## Önemli Değişiklikler
+
+### Varsayılan Backend: `neqsim-gerg2008`
+Yeni kurulumlarda varsayılan hesaplama yöntemi NeqSim GERG-2008 olarak değiştirildi. NeqSim kurulu değilse otomatik olarak CoolProp/AGA8 fallback zinciri devreye girer.
+
+### Fallback Zinciri (Yeni)
+```
+neqsim-gerg2008 → neqsim-eoscg → neqsim-srk-cpa → neqsim-srk-peneloux →
+neqsim-pr-mc → neqsim-soreide → neqsim-umrpru → neqsim-srk → neqsim-pr →
+GERG-2008(pyaga8) → HEOS → SRK → PR → Z-only(ANN10)
+```
+
+## Gereksinimler
+
+| Bağımlılık | Versiyon | Zorunlu? | Açıklama |
+|-----------|----------|----------|----------|
+| Java | 11+ | **Evet** (NeqSim için) | Adoptium/Temurin JDK önerilir |
+| neqsim | ≥3.6.1 | Hayır | `pip install neqsim` (CoolProp fallback çalışır) |
+| CoolProp | ≥7.2.0 | **Evet** | Ana termodinamik motor (NeqSim yoksa) |
+| pyaga8 | ≥0.1.16 | Hayır | AGA8/GERG-2008 (NeqSim yoksa) |
+
+## Yükseltme
+
+```bash
+# Java 11+ kurulu değilse: https://adoptium.net/
+pip install --upgrade natural-gas-prop-main
+pip install neqsim>=3.6.1  # isteğe bağlı
+```
+
+## Test Altyapısı
+
+| Metrik | v1.5.x | v1.6.0 |
+|--------|--------|--------|
+| Test sayısı | 545+ | **585+** |
+| Yeni test dosyası | - | `test_neqsim_calculator.py` (24 test) |
+| NeqSim mock test | - | 23 passed, 1 skip |
+
+---
+
 # Natural Gas Prop Main v1.5.0
 
 **Tarih:** 30 Mayıs 2026
@@ -66,17 +135,3 @@ CoolProp v7.2.0 ile faz zarfı kritik nokta (`critical_t`, `critical_p`) çıkar
 - `test_phase_envelope.py` – Faz zarfı kritik nokta
 - `test_aga8_extended.py` – AGA8 mapping + edge case'ler
 - `test_release_readiness.py` – Dinamik versiyon karşılaştırma (düzeltildi)
-
-## Yükseltme
-
-```bash
-pip install --upgrade natural-gas-prop-main==1.5.0
-```
-
-## İndirme
-
-| Platform | Dosya |
-|----------|-------|
-| macOS | `Natural Gas Prop Main v1.5.0.dmg` |
-| Windows | `Natural Gas Prop Main.exe` |
-| pip | `natural_gas_prop_main-1.5.0-py3-none-any.whl` |

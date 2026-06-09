@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "natural-gas-prop-main"
-version = "1.5.2"
+version = "1.6.0"
 description = "Termodinamik doğal gaz karışımı hesaplama uygulaması"
 readme = "README.md"
 license = { text = "Proprietary - Kompresör Pompa" }
@@ -20,6 +20,7 @@ dependencies = [
     "fpdf2>=2.8.0",
     "pyaga8>=0.1.16",
     "packaging>=21.0",
+    "neqsim>=3.6.1",
 ]
 
 [project.scripts]
@@ -48,6 +49,7 @@ markers = [
     "unit: Birim testleri",
     "ui: GUI testleri (headless'da skip)",
     "accuracy: Doğruluk validasyon testleri",
+    "neqsim: NeqSim bağımlı testler",
 ]
 
 [tool.coverage.run]

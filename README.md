@@ -2,13 +2,13 @@
 
 **Modern, modüler termodinamik gaz karışımı hesaplama uygulaması**
 
-![Version](https://img.shields.io/badge/version-v1.5.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.6.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10+-green.svg)
 
 ## 🎯 Özellikler
 
-- ✅ **Kapsamlı Hesaplamalar:** Z-faktörü, yoğunluk, entalpi, entropi, Cp, Cv, k, ses hızı, HHV/LHV, Wobbe indeksi
-- ✅ **Çoklu Backend:** HEOS, SRK, PR termodinamik modelleri
+- ✅ **Kapsamlı Hesaplamalar:** Z-faktörü, yoğunluk, entalpi, entropi, Cp, Cv, k, ses hızı, HHV/LHV, Wobbe indeksi, transport properties
+- ✅ **Çoklu Backend:** CoolProp (HEOS/SRK/PR), pyaga8 (GERG-2008/AGA8-Detail), **NeqSim (15 EOS)**
 - ✅ **Otomatik Fallback:** Hesaplama başarısız olursa alternatif backend'lere geçiş
 - ✅ **Type Safety:** Pydantic modelleri ile tip güvenli veri yapıları
 - ✅ **Modüler Mimari:** Kolay test, bakım ve genişletme
@@ -17,6 +17,7 @@
 ## 📋 Gereksinimler
 
 - Python 3.10 veya üzeri
+- Java 11+ (NeqSim entegrasyonu için, isteğe bağlı)
 - CoolProp >= 7.2.0
 - Pydantic >= 2.0.0
 
@@ -28,7 +29,14 @@
 pip install -r requirements.txt
 ```
 
-### 2. (Opsiyonel) Geliştirme Araçlarını Yükleyin
+### 2. (Opsiyonel) NeqSim Desteği
+
+```bash
+# Java 11+ kurulu değilse: https://adoptium.net/
+pip install neqsim>=3.6.1
+```
+
+### 3. (Opsiyonel) Geliştirme Araçlarını Yükleyin
 
 ```bash
 pip install -r requirements-dev.txt
@@ -124,6 +132,15 @@ pytest tests/test_calculator.py -v
 ```
 
 ## 📝 Değişiklik Geçmişi
+
+### Sürüm v1.6.0 (Haziran 2026)
+- 🔥 **NeqSim Entegrasyonu:** Equinor NeqSim ile 15 yeni EOS modeli
+- 🧪 **Transport Properties:** Viskozite, termal iletkenlik, Joule-Thomson, yüzey gerilimi
+- 📐 **NeqSim ISO 6976:** HHV/LHV/Wobbe için ISO standardı desteği
+- 🧊 **CPA Hidrat Modeli:** vdW-Platteeuw (4. model)
+- ⚡ **24 yeni test** (toplam 585+), NeqSim mock ile doğrulama
+- 🖥️ **Backend bilgi gösterimi:** Seçilen EOS modelinin grup/açıklaması UI'da
+- ☕ **Gereksinim:** Java 11+ (NeqSim için), CoolProp fallback çalışır
 
 ### Sürüm v1.5.0 (2026-05-30)
 - 🔥 **Wichert-Aziz Asit Gaz Düzeltmesi:** H₂S ve CO₂ içeren gazlar için Z-faktörü hesabı

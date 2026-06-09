@@ -110,13 +110,17 @@ def show_backend_used_info(requested_backend: str, used_backend: str) -> None:
 
 def show_about_dialog() -> None:
     """Show application about information."""
+    from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE
+    neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.5.2 - Profesyonel Sürüm\n\n"
-        "Bu program, CoolProp kütüphanesini kullanarak gaz karışımlarının\n"
-        "termodinamik özelliklerini hesaplar.\n\n"
-        "v1.5.2 sürümü: Kapsamlı test coverage iyileştirmeleri (%73→%95),\n"
-        "545 test, 11 modül ≥%92 coverage.\n\n"
+        "Sürüm v1.6.0 - Profesyonel Sürüm\n\n"
+        "HESAPLAMA MOTORLARI:\n"
+        "• CoolProp (HEOS, SRK, PR) - Termodinamik özellikler\n"
+        "• pyaga8 (GERG-2008, AGA8-Detail) - AGA8 standardı\n"
+        f"• NeqSim (15 EOS) - {neqsim_status}\n\n"
+        "v1.6.0 sürümü: NeqSim entegrasyonu, 15 yeni EOS,\n"
+        "transport properties, CPA hidrat modeli.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -125,6 +129,16 @@ def show_about_dialog() -> None:
 def show_user_guide_dialog() -> None:
     """Show user guide information."""
     from natural_gas_main.config.settings import config
+    from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE
+    
+    neqsim_note = ""
+    if not NEQSIM_AVAILABLE:
+        neqsim_note = (
+            "\n⚠ NEQSIM UYARISI:\n"
+            "   NeqSim kullanılamıyor (Java 11+ gerekli).\n"
+            "   Java kurulumu: https://adoptium.net/\n"
+            "   pip install neqsim>=3.6.1\n"
+        )
     
     guide_text = (
         "KULLANIM KILAVUZU - Natural Gas Prop Main\n\n"
@@ -136,29 +150,52 @@ def show_user_guide_dialog() -> None:
         f"   • Gauge (g) basınçları için atmosferik basınç ({config.P_ATM_BAR} bar) referans alınır\n"
         "   • Absolute (a) basınçlar doğrudan kullanılır\n\n"
         "3. HESAPLAMA YÖNTEMİ:\n"
-        "   • HEOS: En doğru, ancak sınırlı gaz desteği\n"
-        "   • SRK/PR: Daha geniş kapsam, cubic equations of state\n"
-        "   • Uyumsuzluk durumunda otomatik geçiş yapılabilir\n\n"
+        "   • NeqSim (15 EOS): GERG-2008, SRK/PR ailesi, CPA, Søreide-Whitson, UMR-PRU\n"
+        "   • CoolProp (HEOS/SRK/PR): Klasik termodinamik hesaplamalar\n"
+        "   • pyaga8 (GERG-2008/AGA8-Detail): ISO 20765-2 standardı\n"
+        "   • Uyumsuzluk durumunda otomatik geçiş yapılır\n"
+        f"{neqsim_note}"
         "4. ISIL DEĞER GÜVENİLİRLİĞİ (KRİTİK):\n"
-        "   • 'CoolProp yerleşik': En doğru yöntem\n"
-        "   • 'Bileşen bazlı': Yedekleme yöntemi, daha düşük doğruluk\n"
+        "   • 'NeqSim ISO 6976': En doğru (ISO standardı)\n"
+        "   • 'CoolProp yerleşik': Yüksek doğruluk\n"
+        "   • 'Bileşen bazlı': Yedekleme yöntemi\n"
         "   • Uyarı mesajları dikkate alınmalıdır\n\n"
         "5. SONUÇLAR:\n"
         "   • Gerçek koşullar (girilen T ve P'de)\n"
         "   • Standart koşullar (15°C, 101.325 kPa)\n"
         "   • Isıl değerler (HHV, LHV, Wobbe)\n"
+        "   • Taşınım özellikleri (viskozite, termal iletkenlik)\n"
         "   • Hacim dönüşümü (isteğe bağlı)"
     )
     messagebox.showinfo("Kullanım Kılavuzu", guide_text)
 
 
+def show_neqsim_unavailable_warning(selected_backend: str) -> None:
+    """
+    Show warning when a NeqSim EOS is selected but Java/NeqSim is not available.
+    
+    Args:
+        selected_backend: The NeqSim EOS name that was selected
+    """
+    messagebox.showwarning(
+        "NeqSim Kullanılamıyor",
+        f"'{selected_backend}' seçildi ancak NeqSim kullanılamıyor.\n\n"
+        "Gereksinimler:\n"
+        "• Java 11+ Runtime (JRE) kurulu olmalı\n"
+        "  https://adoptium.net/\n\n"
+        "• neqsim Python paketi yüklenmeli:\n"
+        "  pip install neqsim>=3.6.1\n\n"
+        "CoolProp/AGA8 fallback zinciri kullanılacak."
+    )
+
+
 def show_new_features_info() -> None:
-    """Show new features information for v1.4 with do not show again option."""
+    """Show new features information for current version with do not show again option."""
     from natural_gas_main.config.settings import config
-    # Create custom window
+    version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title("Yenilikler - Sürüm v1.5.2")
-    dialog.geometry("620x600")
+    dialog.title(f"Yenilikler - Sürüm v{version}")
+    dialog.geometry("620x560")
     dialog.resizable(False, False)
     
     dialog.transient()
@@ -169,59 +206,49 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text="🚀 DOĞAL GAZ PROP - YENİ SÜRÜM",
-        font=ctk.CTkFont(size=14, weight="bold")
-    ).pack(pady=(0, 20))
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v{version}",
+        font=ctk.CTkFont(size=15, weight="bold")
+    ).pack(pady=(0, 15))
     
-    info_text = (
-        "🌟 YENİ ÖZELLİKLER (v1.5.2):\n"
-        "• Kapsamlı Test Coverage: %73→%95 (545 test, 11 modül ≥%92).\n"
-        "• Test Aşama 1 (Kolay): exceptions.py, heating_value_db.py, result_unit_converter.py,\n"
-        "  settings.py, calculation_result.py → %100 coverage.\n"
-        "• Test Aşama 2 (Orta): converters.py, z_factor.py, iso6976.py, preferences.py,\n"
-        "  gas_data.py → mock ile edge case testleri.\n"
-        "• Test Aşama 3 (Zor): logger.py (%18→%98), updater.py (%40→%96),\n"
-        "  aga8_calculator.py (%79→%96) — dosya/HTTP/font mock.\n"
-        "• Test Aşama 4 (Detaylı): calculator.py (%76→%93) — FakeAbstractState ile.\n"
-        "• report_generator.py: %80→%92 — font fallback, log okuma, PDF hata yönetimi.\n"
-        "• Tüm modüllerde edge case ve exception yolu testleri.\n\n"
-        "🌟 ÖNCEKİ ÖZELLİKLER (v1.5.1):\n"
-        "• Kritik Hata Düzeltmeleri: HEOS/SRK backend seçimi ters mantık düzeltildi.\n"
-        "• Sutton Sıcaklık Dönüşümü: °R→K dönüşüm hatası giderildi (~255K sapma).\n"
-        "• H₂S Isıl Değer: %7.6 hata düzeltildi (ISO 6976:2016 uyumlu).\n"
-        "• ISO 6976:2016 Modülü: 8 yeni bileşen (O₂, Ar, He, H₂O, Air, Neopentane, n-Nonan, n-Dekan).\n"
-        "• Kütle-Bazlı Sıcaklık Düzeltmesi: ISO 6976:2016 §8.3'e göre kaldırıldı.\n"
-        "• Atomik Dosya Yazma: Veri kaybı önlemi (tempfile + os.replace).\n"
-        "• Thread Güvenliği: Lock ile yarış durumu engellendi.\n"
-        "• CoolProp Log Gürültüsü: debug_level=0 ile susturuldu.\n"
-        "• PDF Footer: macOS Helvetica.dfont yolu, sol/sağ hizalama.\n"
-        "• Fraksiyon Normalizasyonu: normalize_fractions() metodu.\n"
-        "• Gaz Adı Eşleme: difflib ile fuzzy eşleme (örn. Butane→n-Butane).\n"
-        "• Cricondenbar T: Faz zarfına eklendi.\n"
-        "• Pasta Grafiği: Dark mode renk düzeltmesi.\n"
-        "• Şema Versiyon Zorunluluğu: Uyumsuz .ngp dosyaları reddedilir.\n\n"
-        "🌟 ÖNCEKİ ÖZELLİKLER (v1.5.0):\n"
-        "• Wichert-Aziz Düzeltmesi: Asit gaz (H₂S/CO₂) için doğru Z-faktörü hesabı.\n"
-        "• ISO 6976:2016 Modülü: Uluslararası standart uyumlu ısıl değer hesaplama.\n"
-        "• Sutton(1985) Korelasyonu: SG'den pseudo-kritik özellik tahmini.\n"
-        "• Faz Diyagramı Kritik Nokta: Gelişmiş faz zarfı analizi.\n"
-        "• PDF Raporlama: macOS ve Linux için font desteği.\n"
-        "• Performans: Hızlı tercih okuma, bellek optimizasyonu.\n"
-        "• Hata Düzeltmeleri: Isıl değer, AGA8, standart koşullar.\n\n"
-        "🌟 ÖNCEKİ ÖZELLİKLER (v1.4.1):\n"
-        "• Kod temizliği: God method ayrıştırması, Pydantic v2 uyumu.\n"
-        "• Performans: PropsSI cache, pie chart throttle.\n"
-        "• Security: Download URL GitHub-only doğrulaması.\n"
-        "• 133 test, güçlendirilmiş hata yönetimi.\n\n"
-        "🌟 ÖNCEKİ ÖZELLİKLER (v1.1):\n"
-        "• Faz Diyagramı, Profesyonel PDF Raporu, Pasta Grafiği.\n"
-        "• Çoklu Tema Desteği, Akıllı Filtreleme, Hazır Şablonlar.\n\n"
-        "🎉 ÖNCEKİ ÖZELLİKLER (v1.0):\n"
-        "• Modüler Mimari ve Modern CustomTkinter Arayüzü.\n"
-        "• KPI Panosu, Thread-Safe hesaplama yapısı."
-    )
+    if version in ("v1.6.0", "v1.6"):
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
+            "• NeqSim Entegrasyonu: Equinor NeqSim ile 15 yeni EOS modeli.\n"
+            "  - SRK/PR ailesi (8 model), CPA, Søreide-Whitson\n"
+            "  - GERG-2008, EOS-CG, Span-Wagner, UMR-PRU\n\n"
+            "• Transport Properties: Viskozite, termal iletkenlik,\n"
+            "  Joule-Thomson katsayısı, yüzey gerilimi.\n\n"
+            "• NeqSim ISO 6976: HHV/LHV/Wobbe için ISO standardı (Stage 0).\n\n"
+            "• CPA Hidrat Modeli: vdW-Platteeuw (4. model).\n\n"
+            "• Gerçek Zamanlı Hata Yükleme: crash gönderme (CurseForge/mail).\n\n"
+            "Gereksinim: Java 11+ ve pip install neqsim>=3.6.1\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.5.2":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ DEĞİŞİKLİKLER:\n\n"
+            "• Kapsamlı Test Coverage: %73→%95 (545 test, 11 modül ≥%92).\n"
+            "• Test Aşama 1: exceptions, heating_value_db, result_unit_converter,\n"
+            "  settings, calculation_result → %100 coverage.\n"
+            "• Test Aşama 2: converters, z_factor, iso6976, preferences,\n"
+            "  gas_data → mock ile edge case testleri.\n"
+            "• Test Aşama 3: logger (%18→%98), updater (%40→%96),\n"
+            "  aga8_calculator (%79→%96).\n"
+            "• Test Aşama 4: calculator (%76→%93) — FakeAbstractState ile.\n"
+            "• report_generator: %80→%92 — font fallback, PDF hata yönetimi.\n"
+            "• Tüm modüllerde edge case ve exception yolu testleri.\n\n"
+            "🔧 ÖNCEKİ SÜRÜMDEN (v1.5.1) DEVAM EDEN:\n"
+            "• HEOS/SRK backend seçimi ters mantık düzeltildi.\n"
+            "• Sutton Sıcaklık Dönüşümü: °R→K dönüşüm hatası giderildi.\n"
+            "• H₂S Isıl Değer: %7.6 hata düzeltildi (ISO 6976:2016 uyumlu).\n"
+            "• ISO 6976:2016 Modülü: 8 yeni bileşen eklendi.\n"
+            "• Fraksiyon Normalizasyonu, Thread Güvenliği, Gaz Adı Eşleme.\n\n"
+            "Detaylı sürüm notları için RELEASE_NOTES.md dosyasına bakın."
+        )
+    else:
+        info_text = f"Sürüm {version} yayında. Detaylı değişiklik listesi için RELEASE_NOTES.md dosyasına bakın."
     
-    text_area = ctk.CTkTextbox(frame, wrap=tk.WORD, height=250, width=540, font=ctk.CTkFont(size=12))
+    text_area = ctk.CTkTextbox(frame, wrap=tk.WORD, height=280, width=540, font=ctk.CTkFont(size=12))
     text_area.insert("1.0", info_text)
     text_area.configure(state="disabled")
     text_area.pack(fill=tk.BOTH, expand=True, pady=(0, 10))

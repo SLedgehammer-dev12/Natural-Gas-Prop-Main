@@ -184,3 +184,34 @@ class TestIso6976EdgeCases:
             fraction_type="molar",
         )
         assert iso6976.is_iso6976_compatible(mixture) is True
+
+    def test_coolprop_import_failure_returns_none(self):
+        """When CoolProp cannot be imported, _get_mass_weights should return None."""
+        from unittest.mock import patch
+        mixture = GasMixture(
+            components=[GasComponent(name="Methane", fraction=100.0)],
+            fraction_type="molar",
+        )
+        import builtins
+        real_import = builtins.__import__
+        def mock_import(name, *args, **kwargs):
+            if name == "CoolProp.CoolProp":
+                raise ImportError("No CoolProp")
+            return real_import(name, *args, **kwargs)
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = iso6976._get_mass_weights(mixture, lambda x: x)
+            assert result is None
+
+    def test_weight_zero_skipped(self):
+        """Components with zero weight should be skipped in calculation."""
+        from unittest.mock import patch, MagicMock
+        mixture = GasMixture(
+            components=[GasComponent(name="Methane", fraction=100.0)],
+            fraction_type="molar",
+        )
+        # Mock _get_mass_weights to return zero weight for methane
+        with patch("natural_gas_main.models.iso6976._get_mass_weights",
+                   return_value={"Methane": 0.0}):
+            hhv, lhv = iso6976.calculate_iso6976_heating_values(mixture)
+            assert hhv is None
+            assert lhv is None

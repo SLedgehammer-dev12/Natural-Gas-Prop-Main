@@ -26,7 +26,25 @@ class ActualConditionResults(BaseModel):
     cv: float = Field(..., description="Specific heat at constant volume (kJ/kg·K)")
     isentropic_exponent: Optional[float] = Field(None, description="k = Cp/Cv (dimensionless)")
     speed_of_sound: Optional[float] = Field(None, description="Speed of sound (m/s)")
-    
+    viscosity: Optional[float] = Field(None, description="Dynamic viscosity (cP)")
+    thermal_conductivity: Optional[float] = Field(None, description="Thermal conductivity (W/mK)")
+    joule_thomson_coefficient: Optional[float] = Field(None, description="Joule-Thomson coefficient (K/Pa)")
+    surface_tension: Optional[float] = Field(None, description="Surface tension (N/m)")
+    has_aqueous_phase: Optional[bool] = Field(None, description="Whether an aqueous phase is present")
+    has_liquid_hc_phase: Optional[bool] = Field(None, description="Whether a liquid hydrocarbon phase is present")
+
+    model_config = {"frozen": False}
+
+
+class TransportProperties(BaseModel):
+    """Transport properties calculated by NeqSim."""
+    viscosity_cp: Optional[float] = Field(None, description="Dynamic viscosity (cP)")
+    thermal_conductivity: Optional[float] = Field(None, description="Thermal conductivity (W/mK)")
+    joule_thomson_coefficient: Optional[float] = Field(None, description="Joule-Thomson coefficient (K/Pa)")
+    surface_tension: Optional[float] = Field(None, description="Surface tension (N/m)")
+    has_aqueous_phase: Optional[bool] = Field(None, description="Aqueous phase present")
+    has_liquid_hc_phase: Optional[bool] = Field(None, description="Liquid HC phase present")
+
     model_config = {"frozen": False}
 
 
@@ -154,6 +172,7 @@ class CalculationResult(BaseModel):
     z_factor_comparison: List[ZFactorComparison] = Field(default_factory=list, description="Standing-Katz/DAK Z estimates")
     z_fallback_warning: Optional[str] = Field(None, description="Warning if result is Z-only fallback")
     hydrate: Optional[HydrateResults] = Field(None, description="Hydrate analysis results")
+    transport: Optional[TransportProperties] = Field(None, description="Transport properties from NeqSim")
     
     def to_display_list(self, unit_system: str = "SI") -> List[Tuple[str, str, str]]:
         """
@@ -321,6 +340,22 @@ class CalculationResult(BaseModel):
                 results.append(("Normal Hacim (NCM)", "Hesaplanamadı", "-"))
                 results.append(("Hata Detayı", self.volume_conversion.normal_volume_error, ""))
         
+        # Transport Properties
+        if self.transport:
+            results.append(("- TAŞINIM ÖZELLİKLERİ -", "", ""))
+            if self.transport.viscosity_cp is not None:
+                results.append(("Viskozite (μ)", f"{self.transport.viscosity_cp:.4f}", "cP"))
+            if self.transport.thermal_conductivity is not None:
+                results.append(("Termal İletkenlik (k)", f"{self.transport.thermal_conductivity:.4f}", "W/mK"))
+            if self.transport.joule_thomson_coefficient is not None:
+                results.append(("Joule-Thomson Katsayısı", f"{self.transport.joule_thomson_coefficient:.6f}", "K/Pa"))
+            if self.transport.surface_tension is not None:
+                results.append(("Yüzey Gerilimi (σ)", f"{self.transport.surface_tension:.4f}", "N/m"))
+            if self.transport.has_aqueous_phase:
+                results.append(("Sulu Faz", "Mevcut", ""))
+            if self.transport.has_liquid_hc_phase:
+                results.append(("Sıvı HC Faz", "Mevcut", ""))
+
         # Hydrate Analysis
         if self.hydrate:
             results.append(("- HİDRAT OLUŞUM ANALİZİ -", "", ""))

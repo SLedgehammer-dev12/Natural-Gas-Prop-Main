@@ -4,3 +4,4 @@ customtkinter>=5.2.2
 matplotlib>=3.10.0
 fpdf2>=2.8.0
 pyaga8>=0.1.16
+neqsim>=3.6.1

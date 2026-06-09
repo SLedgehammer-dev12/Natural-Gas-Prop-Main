@@ -96,7 +96,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.5.2 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.6.0 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -128,11 +128,23 @@ class AppConfig(BaseModel):
     
     # Calculation Settings
     DEFAULT_BACKEND: str = Field(
-        default="GERG-2008",
-        description="Default CoolProp/AGA8 backend"
+        default="neqsim-gerg2008",
+        description="Default thermodynamic backend"
     )
     AVAILABLE_BACKENDS: List[str] = Field(
-        default=["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"],
+        default=[
+            # --- NeqSim Backends (15 EOS) ---
+            "neqsim-gerg2008", "neqsim-gerg2008-h2", "neqsim-eoscg",
+            "neqsim-spanwagner", "neqsim-umrpru",
+            "neqsim-srk-cpa",
+            "neqsim-soreide",
+            "neqsim-srk", "neqsim-srk-peneloux",
+            "neqsim-srk-mc", "neqsim-srk-twucoon",
+            "neqsim-pr", "neqsim-pr-mc",
+            "neqsim-pr-twucoon", "neqsim-pr-danesh",
+            # --- Existing CoolProp/AGA8 Backends ---
+            "GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR",
+        ],
         description="Available thermodynamic backends"
     )
     
@@ -195,7 +207,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.5.2",
+        default="v1.6.0",
         description="Current application version"
     )
     REPO_USER: str = Field(
