@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to build for (e.g. v1.6.0)'
+        required: true
+        default: 'v1.6.0'
+        type: string
 
 permissions:
   contents: write
@@ -21,11 +27,9 @@ jobs:
       - name: Extract version from tag
         id: get_version
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}"
           echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
           echo "Tag version: $tag"
-
-
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -46,4 +50,5 @@ jobs:
       - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
           files: dist/*.exe
