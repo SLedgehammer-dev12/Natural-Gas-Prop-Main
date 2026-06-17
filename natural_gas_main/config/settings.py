@@ -96,7 +96,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.6.0 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.6.1 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -159,7 +159,8 @@ class AppConfig(BaseModel):
             "Hydrogen", "Oxygen", "Argon", "Helium", "CarbonMonoxide",
             "Ethylene", "Propylene", "1-Butene", "IsoButene", "cis-2-Butene",
             "trans-2-Butene", "CycloPropane", "Cyclopentane", "CycloHexane",
-            "Ammonia", "Neon", "Krypton", "Xenon"
+            "Ammonia", "Neon", "Krypton", "Xenon",
+            "Methanol"
         ],
         description="Gases compatible with HEOS backend for mixtures"
     )
@@ -171,7 +172,8 @@ class AppConfig(BaseModel):
             "n-Pentane", "Isopentane", "n-Hexane", "n-Heptane", "n-Octane",
             "n-Nonane", "n-Decane", "Nitrogen", "CarbonDioxide",
             "HydrogenSulfide", "CarbonylSulfide", "Water", "Hydrogen", "Helium",
-            "Oxygen", "Argon", "CarbonMonoxide", "Ethylene", "Propylene", "Air"
+            "Oxygen", "Argon", "CarbonMonoxide", "Ethylene", "Propylene", "Air",
+            "Methanol", "MEG", "TEG",
         ],
         description="Fallback gas list when CoolProp database unavailable"
     )
@@ -190,7 +192,9 @@ class AppConfig(BaseModel):
             "CarbonMonoxide", "Helium", "Ethylene", "Propylene", "1-Butene",
             "IsoButene", "cis-2-Butene", "trans-2-Butene", "CycloPropane",
             "Cyclopentane", "CycloHexane", "Ammonia", "Neon", "Krypton",
-            "Xenon", "Air"
+            "Xenon", "Air",
+            # Hydrate inhibitors (NeqSim CPA-compatible)
+            "Methanol", "MEG", "TEG",
         ],
         description="Relevant natural gas components for UI filtering"
     )
@@ -207,7 +211,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.6.0",
+        default="v1.6.1",
         description="Current application version"
     )
     REPO_USER: str = Field(

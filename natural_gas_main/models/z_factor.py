@@ -127,7 +127,7 @@ class StandingKatzZFactor:
         y_co2 = mole_fractions.get("CarbonDioxide", 0.0) + mole_fractions.get("Karbondioksit", 0.0)
         total_acid = y_h2s + y_co2
 
-        if total_acid > 0.001:
+        if total_acid > 0.01:
             tpc, ppc = self._wichert_aziz(tpc, ppc, y_h2s, y_co2, total_acid)
 
         return PseudoCriticalProperties(tpc, ppc, molar_mass)
@@ -199,19 +199,19 @@ class StandingKatzZFactor:
         if y_hc <= 0:
             raise ValueError("Hydrocarbon fraction must be > 0 for Sutton correlation")
 
-        sg_hc = max(0.55, sg_gas - 0.967 * y_n2 - 1.52 * y_co2 - 1.18 * y_h2s)
+        sg_hc = max(0.55, (sg_gas - 0.9672 * y_n2 - 1.5195 * y_co2 - 1.1767 * y_h2s) / y_hc)
 
         tpc_hc_f = 169.2 + 349.5 * sg_hc - 74.0 * sg_hc ** 2
         ppc_hc_psi = 756.8 - 131.0 * sg_hc - 3.6 * sg_hc ** 2
 
-        tpc_f = y_hc * tpc_hc_f + y_n2 * (-226.0) + y_co2 * (548.0) + y_h2s * (672.0)
+        tpc_f = y_hc * tpc_hc_f + y_n2 * 227.3 + y_co2 * 548.0 + y_h2s * 672.0
         ppc_psi = y_hc * ppc_hc_psi + y_n2 * 493.0 + y_co2 * 1071.0 + y_h2s * 1306.0
 
         tpc_k = tpc_f * 5.0 / 9.0
         ppc_pa = ppc_psi * 6894.757
 
         total_acid = y_co2 + y_h2s
-        if total_acid > 0.001 or y_h2s > 0.001:
+        if total_acid > 0.01:
             tpc_k, ppc_pa = StandingKatzZFactor._wichert_aziz(
                 tpc_k, ppc_pa, y_h2s, y_co2, total_acid
             )
@@ -256,6 +256,11 @@ class StandingKatzZFactor:
         return self._ann(ppr, tpr, self.WB1_5, self.WB2_5, self.WB3_5)
 
     def dak(self, ppr: float, tpr: float) -> float:
+        if not self._is_valid_range(ppr, tpr):
+            raise ValueError(
+                f"DAK input out of valid range: "
+                f"Ppr={ppr:.3f} (need 0–30), Tpr={tpr:.3f} (need 1.0–3.0)"
+            )
         a1, a2, a3, a4, a5 = 0.3265, -1.07, -0.5339, 0.01569, -0.05165
         a6, a7, a8, a9 = 0.5475, -0.7361, 0.1844, 0.1056
         a10, a11 = 0.6134, 0.721

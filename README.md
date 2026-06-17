@@ -2,7 +2,7 @@
 
 **Modern, modüler termodinamik gaz karışımı hesaplama uygulaması**
 
-![Version](https://img.shields.io/badge/version-v1.6.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.6.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10+-green.svg)
 
 ## 🎯 Özellikler
@@ -132,6 +132,15 @@ pytest tests/test_calculator.py -v
 ```
 
 ## 📝 Değişiklik Geçmişi
+
+### Sürüm v1.6.1 (Haziran 2026)
+- 🛡️ **AGA8 Çökme Koruması:** Rust paniği yakalanıyor, UI donmuyor
+- 🐛 **TclError Düzeltmesi:** Giriş alanı temizleme hatası giderildi
+- 🔍 **DAK Validasyonu:** Geçersiz aralık (Tpr<1.0) önceden tespit
+- 🎨 **Koyu Mod Lejant:** Faz zarfı lejant rengi düzeltildi
+- 🌡️ **ISO 6976 Sıcaklık:** Dinamik referans sıcaklığı
+- 🧊 **Hidrat Ayrıştırma:** NeqSim CPA ayrı gösteriliyor
+- ✅ **Test:** 641 passed, %94.94 coverage
 
 ### Sürüm v1.6.0 (Haziran 2026)
 - 🔥 **NeqSim Entegrasyonu:** Equinor NeqSim ile 15 yeni EOS modeli

@@ -81,6 +81,21 @@ class FakeAbstractState:
     def LHVmass(self):
         return 50.0e6
 
+    def isentropic_exponent(self):
+        raise AttributeError("Not supported in test mock")
+
+    def viscosity(self):
+        raise AttributeError("Not supported in test mock")
+
+    def conductivity(self):
+        raise AttributeError("Not supported in test mock")
+
+    def joule_thomson_coefficient(self):
+        raise AttributeError("Not supported in test mock")
+
+    def surface_tension(self):
+        raise AttributeError("Not supported in test mock")
+
     def keyed_output(self, key):
         return None
 

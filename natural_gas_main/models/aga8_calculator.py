@@ -9,6 +9,7 @@ and reduce file size.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Dict
 
 from natural_gas_main.models.calculation_result import ActualConditionResults
@@ -134,11 +135,25 @@ def calculate_aga8(
     engine.temperature = temperature_k
     engine.pressure = pressure_pa / 1000.0
 
-    if method == "GERG-2008":
-        engine.calc_density(0)
-    else:
-        engine.calc_density()
-    engine.calc_properties()
+    # Redirect fd 2 to suppress Rust panic messages from pyaga8
+    old_fd = os.dup(2)
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull_fd, 2)
+    os.close(devnull_fd)
+    try:
+        if method == "GERG-2008":
+            engine.calc_density(0)
+        else:
+            engine.calc_density()
+        engine.calc_properties()
+    except BaseException as e:
+        raise ValueError(
+            f"AGA8 {method} density calculation failed at "
+            f"T={temperature_k} K, P={pressure_pa} Pa: {e}"
+        ) from e
+    finally:
+        os.dup2(old_fd, 2)
+        os.close(old_fd)
 
     return ActualConditionResults(
         temperature=temperature_k,

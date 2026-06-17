@@ -144,9 +144,13 @@ class HydrateResults(BaseModel):
     t_hydrate_motiee: float = Field(..., description="Motiee predicted temperature (K)")
     t_hydrate_towler_mokhatab: float = Field(..., description="Towler-Mokhatab predicted temperature (K)")
     
-    # Average of the three predictions
+    # Average of the three empirical predictions
     t_hydrate_average: float = Field(..., description="Average predicted temperature (K)")
-    
+
+    # NeqSim CPA-based prediction (recommended), shown separately
+    t_hydrate_neqsim: Optional[float] = Field(default=None, description="NeqSim CPA predicted temperature (K)")
+    risk_neqsim: Optional[bool] = Field(default=None, description="Risk based on NeqSim CPA")
+
     # Hydrate formation risk assessment
     risk_hammerschmidt: bool = Field(..., description="Risk of hydrate formation using Hammerschmidt")
     risk_motiee: bool = Field(..., description="Risk of hydrate formation using Motiee")
@@ -385,11 +389,17 @@ class CalculationResult(BaseModel):
             results.append(("Motiee Limit Sıcaklığı", self._format_float(t_mot_disp, 2), t_unit))
             results.append(("Towler-Mokhatab Limit Sıcaklığı", self._format_float(t_towl_disp, 2), t_unit))
             results.append(("Ortalama Limit Sıcaklığı", self._format_float(t_avg_disp, 2), t_unit))
-            
-            # Risk messages
+
+            # Risk messages helper
             def format_risk(risk_bool: bool) -> str:
                 return "RİSK VAR" if risk_bool else "GÜVENLİ"
-                
+
+            # NeqSim CPA (shown separately as recommended method)
+            if self.hydrate.t_hydrate_neqsim is not None:
+                t_neqsim_disp = convert_temperature_from_K(self.hydrate.t_hydrate_neqsim, t_unit)
+                results.append(("NeqSim CPA Limit Sıcaklığı (Önerilen)", self._format_float(t_neqsim_disp, 2), t_unit))
+                results.append(("NeqSim CPA Riski", format_risk(self.hydrate.risk_neqsim), ""))
+
             results.append(("Hammerschmidt Riski", format_risk(self.hydrate.risk_hammerschmidt), ""))
             results.append(("Motiee Riski", format_risk(self.hydrate.risk_motiee), ""))
             results.append(("Towler-Mokhatab Riski", format_risk(self.hydrate.risk_towler_mokhatab), ""))

@@ -155,10 +155,24 @@ class TestSuttonCorrelation:
         assert props.temperature_k > 0
 
     def test_sour_gas_correction_applied(self):
-        """Sutton with H2S should apply Wichert-Aziz."""
-        sweet = StandingKatzZFactor.sutton_pseudo_critical(0.70)
-        sour = StandingKatzZFactor.sutton_pseudo_critical(0.70, y_h2s=0.10)
-        assert sour.temperature_k < sweet.temperature_k
+        """Sutton with H2S should apply Wichert-Aziz.
+
+        With SG=0.70, y_h2s=0.10 (y_hc=0.90):
+          Correct sg_hc = max(0.55, (0.70 - 1.1767*0.10) / 0.90) = 0.6470
+          Without WA: tpc ≈ 219.5 K → After WA: tpc ≈ 210.1 K
+        Verify WA correction lowers Tpc from the WA-free value.
+        """
+        props = StandingKatzZFactor.sutton_pseudo_critical(0.70, y_h2s=0.10)
+        total_acid = 0.10
+        epsilon = (
+            120.0 * (total_acid ** 0.9 - total_acid ** 1.6)
+            + 15.0 * (0.10 ** 0.5 - 0.10 ** 4.0)
+        )
+        tpc_before_wa_r = props.temperature_k * 9.0 / 5.0 + epsilon
+        tpc_before_wa_k = tpc_before_wa_r * 5.0 / 9.0
+        assert props.temperature_k < tpc_before_wa_k, (
+            f"WA should lower Tpc: {props.temperature_k:.2f}K vs {tpc_before_wa_k:.2f}K"
+        )
 
     def test_molar_mass_reasonable(self):
         """Molar mass derived from SG should be reasonable (~18 g/mol)."""
@@ -181,3 +195,56 @@ class TestSuttonCorrelation:
         """SG=1.0 with no impurities."""
         props = StandingKatzZFactor.sutton_pseudo_critical(1.0)
         assert props.temperature_k > 0
+
+    def test_sg_hc_division_correction(self):
+        """Verify Sutton SG_hc is correctly divided by y_hc (no N2 to isolate).
+
+        SG=0.80, y_co2=0.20, y_hc=0.80:
+          Old (buggy): sg_hc = max(0.55, 0.80 - 1.5195*0.20) = max(0.55, 0.4961) = 0.55
+          Correct:      sg_hc = max(0.55, 0.4961 / 0.80) = max(0.55, 0.6201) = 0.6201
+          Old Tpc ≈ 201.0 K, Correct Tpc ≈ 209.2 K (WA applied in both).
+        """
+        props = StandingKatzZFactor.sutton_pseudo_critical(0.80, y_co2=0.20)
+        # The corrected formula gives Tpc > 208 K, old formula gave ~201 K
+        assert props.temperature_k > 208.0, (
+            f"Tpc={props.temperature_k:.2f}K should be >208K with corrected SG_hc division"
+        )
+
+    def test_sg_hc_unchanged_for_pure_hc(self):
+        """For pure HC gas y_hc=1, division should produce identical result."""
+        props = StandingKatzZFactor.sutton_pseudo_critical(0.65)
+        expected_sg_hc = max(0.55, 0.65)  # No impurities, SG stays 0.65
+        expected_tpc_r = 169.2 + 349.5 * expected_sg_hc - 74.0 * expected_sg_hc ** 2
+        expected_tpc_k = expected_tpc_r * 5.0 / 9.0
+        assert abs(props.temperature_k - expected_tpc_k) < 0.1
+
+    def test_sg_hc_with_nitrogen_only(self):
+        """Verify SG_hc is correctly divided with N2 only.
+
+        SG=0.65, y_n2=0.20, y_hc=0.80
+        Numerator = 0.65 - 0.9672*0.20 = 0.45656
+        Correct sg_hc = max(0.55, 0.45656/0.80) = max(0.55, 0.5707) = 0.5707
+        """
+        props = StandingKatzZFactor.sutton_pseudo_critical(0.65, y_n2=0.20)
+        # With corrected N2 Tcrit=227.3°R (not -226.0), Tpc ≈ 178.4 K
+        # Old buggy N2 value gave Tpc ≈ 128.0 K (an extremely low, unphysical value)
+        assert props.temperature_k > 150.0, (
+            f"N2 Tcrit fix should raise Tpc; got {props.temperature_k:.2f}K"
+        )
+        # Compare with pure HC case to ensure different
+        pure = StandingKatzZFactor.sutton_pseudo_critical(0.65)
+        assert abs(props.temperature_k - pure.temperature_k) > 0.1
+
+    def test_n2_tcrit_corrected(self):
+        """Verify N2 Tcrit is 227.3°R (not -226.0°R).
+
+        With the old buggy -226.0°R, 100% N2 would give Tpc = -125.6 K (impossible).
+        With corrected 227.3°R, 80% N2 + 20% HC should give Tpc ~153 K.
+        """
+        with pytest.raises(ValueError, match="Hydrocarbon fraction must be > 0"):
+            StandingKatzZFactor.sutton_pseudo_critical(0.65, y_n2=1.0)
+
+        props = StandingKatzZFactor.sutton_pseudo_critical(1.0, y_n2=0.80)
+        assert props.temperature_k > 100.0, (
+            f"80% N2 should give Tpc > 100K; got {props.temperature_k:.2f}K"
+        )

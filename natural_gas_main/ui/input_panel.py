@@ -9,6 +9,7 @@ from tkinter import ttk
 import customtkinter as ctk
 from typing import List, Tuple, Optional
 import logging
+import warnings
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -270,7 +271,7 @@ class InputPanel(ctk.CTkFrame):
         # Temperature
         ctk.CTkLabel(inputs_frame, text="Sıcaklık:").grid(row=0, column=0, sticky="w", padx=(0, 5))
         
-        self.temp_var = tk.DoubleVar(value=15.0)
+        self.temp_var = tk.StringVar(value="15.0")
         self.temp_var.trace_add("write", lambda *a: self._on_change() if self._on_change else None)
         ctk.CTkEntry(inputs_frame, textvariable=self.temp_var, width=80).grid(row=0, column=1, padx=(0, 5))
         
@@ -287,7 +288,7 @@ class InputPanel(ctk.CTkFrame):
         # Pressure
         ctk.CTkLabel(inputs_frame, text="Basınç:").grid(row=0, column=3, sticky="w", padx=(0, 5))
         
-        self.press_var = tk.DoubleVar(value=1.01325)
+        self.press_var = tk.StringVar(value="1.01325")
         self.press_var.trace_add("write", lambda *a: self._on_change() if self._on_change else None)
         ctk.CTkEntry(inputs_frame, textvariable=self.press_var, width=80).grid(row=0, column=4, padx=(0, 5))
         
@@ -530,7 +531,9 @@ class InputPanel(ctk.CTkFrame):
             wedges, texts = self.pie_ax.pie([1], labels=["Bileşen Yok"], colors=[bg_col])
             for text in texts: text.set_color(text_color)
             
-        self.pie_fig.tight_layout()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            self.pie_fig.tight_layout()
         self.pie_canvas.draw()
     
     # Public methods for getting inputs
@@ -620,7 +623,7 @@ class InputPanel(ctk.CTkFrame):
             ValidationError: If temperature is invalid
         """
         try:
-            val = self.temp_var.get()
+            val = float(self.temp_var.get())
             unit = self.temp_unit_var.get()
             return converters.convert_temperature_to_K(val, unit)
         except Exception as e:
@@ -638,7 +641,7 @@ class InputPanel(ctk.CTkFrame):
             ValidationError: If pressure is invalid
         """
         try:
-            val = self.press_var.get()
+            val = float(self.press_var.get())
             unit = self.press_unit_var.get()
             return converters.convert_pressure_to_Pa(val, unit)
         except Exception as e:

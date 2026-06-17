@@ -451,7 +451,8 @@ def get_neqsim_iso6976(mixture, temperature_ref_k: float = 288.15) -> Optional[D
         nqTPflash(nqf)
 
         gas_system = nqf.getSystem()
-        iso = _jneqsim.standards.gasquality.Standard_ISO6976(gas_system, 15, 15, "volume")
+        t_ref_c = round(temperature_ref_k - 273.15, 2)
+        iso = _jneqsim.standards.gasquality.Standard_ISO6976(gas_system, t_ref_c, t_ref_c, "volume")
         iso.calculate()
 
         return {

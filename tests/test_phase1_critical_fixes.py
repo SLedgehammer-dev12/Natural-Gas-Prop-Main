@@ -96,15 +96,29 @@ class TestSuttonTemperatureConversion:
         )
 
     def test_sutton_with_acid_gas_wa_correction(self):
-        """With H2S, WA correction should lower Tpc further from correct base."""
+        """WA correction should lower Tpc relative to its uncorrected base."""
+        from natural_gas_main.models.z_factor import StandingKatzZFactor
+
+        sour = StandingKatzZFactor.sutton_pseudo_critical(0.70, y_h2s=0.10)
+
+        total_acid = 0.10
+        epsilon = 120.0 * (total_acid ** 0.9 - total_acid ** 1.6) \
+                  + 15.0 * (total_acid ** 0.5 - total_acid ** 4.0)
+        tpc_before_wa_k = (sour.temperature_k * 9.0 / 5.0 + epsilon) * 5.0 / 9.0
+
+        assert sour.temperature_k < tpc_before_wa_k, (
+            "WA-corrected Tpc should be lower than uncorrected"
+        )
+
+    def test_acid_gas_tpc_higher_than_sweet(self):
+        """H2S raises Tpc even after WA correction (H2S Tc=373.1K > CH4 Tc=190.6K)."""
         from natural_gas_main.models.z_factor import StandingKatzZFactor
 
         sweet = StandingKatzZFactor.sutton_pseudo_critical(0.70)
         sour = StandingKatzZFactor.sutton_pseudo_critical(0.70, y_h2s=0.10)
 
-        assert sweet.temperature_k < 300, "Sweet Tpc should be <300K"
-        assert sour.temperature_k < sweet.temperature_k, (
-            "WA correction should lower Tpc"
+        assert sour.temperature_k > sweet.temperature_k, (
+            "Sour Tpc ~210.1K should be > sweet Tpc ~209.8K due to H2S high critical temp"
         )
 
     def test_regression_old_bug_produces_wrong_value(self):

@@ -382,7 +382,7 @@ class ThermoCalculator:
                     cv=res.cv,
                     ppr=ppr, tpr=tpr, valid=True, warning=None
                 ))
-            except Exception as e:
+            except BaseException as e:
                 self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
 
         # 2.5 Add NeqSim backends for comparison
@@ -817,11 +817,16 @@ class ThermoCalculator:
                 except Exception:
                     pass
 
-            # Use NeqSim in average if available
+            # Average of the three empirical models only
             temps = [t_k_hammerschmidt, t_k_motiee, t_k_towler_mokhatab]
-            if t_k_neqsim is not None and not math.isnan(t_k_neqsim):
-                temps.append(t_k_neqsim)
             t_k_average = sum(temps) / len(temps)
+
+            # NeqSim CPA result shown separately (recommended)
+            neqsim_result: Optional[float] = None
+            neqsim_risk: Optional[bool] = None
+            if t_k_neqsim is not None and not math.isnan(t_k_neqsim):
+                neqsim_result = t_k_neqsim
+                neqsim_risk = temperature_k <= t_k_neqsim
 
             # Hydrate formation risk assessment
             risk_hammerschmidt = temperature_k <= t_k_hammerschmidt
@@ -837,6 +842,8 @@ class ThermoCalculator:
                 t_hydrate_motiee=t_k_motiee,
                 t_hydrate_towler_mokhatab=t_k_towler_mokhatab,
                 t_hydrate_average=t_k_average,
+                t_hydrate_neqsim=neqsim_result,
+                risk_neqsim=neqsim_risk,
                 risk_hammerschmidt=risk_hammerschmidt,
                 risk_motiee=risk_motiee,
                 risk_towler_mokhatab=risk_towler_mokhatab,
@@ -969,18 +976,46 @@ class ThermoCalculator:
         cp = state.cpmass() / 1000.0  # kJ/(kg·K)
         cv = state.cvmass() / 1000.0  # kJ/(kg·K)
         
-        # Derived properties
+        # Isentropic exponent (real gas via CoolProp's built-in method)
         k = None
         try:
-            k = cp / cv if cv > 1e-10 else None
-        except ZeroDivisionError:
-            pass
+            k = state.isentropic_exponent()
+        except Exception:
+            try:
+                k = cp / cv if cv > 1e-10 else None
+            except (ZeroDivisionError, ArithmeticError):
+                pass
         
         speed_sound = None
         try:
             speed_sound = state.speed_sound()
         except Exception as e:
             self.logger.warning(f"Speed of sound calculation failed: {e}")
+
+        # Transport properties (CoolProp supports these for many pure fluids & mixtures)
+        viscosity = None
+        try:
+            viscosity = state.viscosity() / 0.001  # Pa·s → cP
+        except Exception:
+            pass
+
+        thermal_conductivity = None
+        try:
+            thermal_conductivity = state.conductivity()  # W/m·K
+        except Exception:
+            pass
+
+        joule_thomson = None
+        try:
+            joule_thomson = state.joule_thomson_coefficient()  # K/Pa
+        except Exception:
+            pass
+
+        surface_tension_val = None
+        try:
+            surface_tension_val = state.surface_tension()  # N/m
+        except Exception:
+            pass
         
         return ActualConditionResults(
             temperature=state.T(),
@@ -994,7 +1029,11 @@ class ThermoCalculator:
             cp=cp,
             cv=cv,
             isentropic_exponent=k,
-            speed_of_sound=speed_sound
+            speed_of_sound=speed_sound,
+            viscosity=viscosity,
+            thermal_conductivity=thermal_conductivity,
+            joule_thomson_coefficient=joule_thomson,
+            surface_tension=surface_tension_val,
         )
     
     def _calculate_standard_conditions(

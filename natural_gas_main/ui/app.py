@@ -408,7 +408,7 @@ class ThermoApp(ctk.CTk):
             # Send success to queue
             self.result_queue.put(("success", (result, used_backend, inputs)))
             
-        except Exception as e:
+        except BaseException as e:
             # Send error to queue
             self.result_queue.put(("error", e))
     

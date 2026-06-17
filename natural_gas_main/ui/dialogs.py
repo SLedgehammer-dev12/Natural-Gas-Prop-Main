@@ -114,12 +114,12 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.6.0 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.6.1 - Profesyonel Sürüm\n\n"
         "HESAPLAMA MOTORLARI:\n"
         "• CoolProp (HEOS, SRK, PR) - Termodinamik özellikler\n"
         "• pyaga8 (GERG-2008, AGA8-Detail) - AGA8 standardı\n"
         f"• NeqSim (15 EOS) - {neqsim_status}\n\n"
-        "v1.6.0 sürümü: NeqSim entegrasyonu, 15 yeni EOS,\n"
+        "v1.6.1 sürümü: NeqSim entegrasyonu, 15 yeni EOS,\n"
         "transport properties, CPA hidrat modeli.\n\n"
         "© 2026 Kompresör Pompa"
     )
@@ -194,7 +194,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm v{version}")
+    dialog.title(f"Yenilikler - Sürüm v1.6.1")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -206,11 +206,26 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v{version}",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.6.1",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version in ("v1.6.0", "v1.6"):
+    if version == "v1.6.1":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ DÜZELTMELER:\n\n"
+            "• AGA8 Çökme Hatası Giderildi: pyaga8 IterationFail paniği artık\n"
+            "  yakalanıyor, uygulama donmuyor. macOS/Windows kararlılık arttı.\n\n"
+            "• Sıcaklık/Basınç Girişi: Alan temizlendiğinde TclError hatası artık yok.\n\n"
+            "• DAK Z-Faktörü: Geçersiz aralık (Tpr<1.0) önceden tespit ediliyor,\n"
+            "  gereksiz iterasyon ve yanıltıcı değerler önlendi.\n\n"
+            "• Pasta Grafiği: Küçük pencere boyutlarında Tight Layout uyarısı sessize alındı.\n\n"
+            "• Koyu Mod Lejant: Faz zarfı lejant yazı rengi siyah→beyaz.\n\n"
+            "• NeqSim ISO 6976: Referans sıcaklığı kullanıcı seçimine göre dinamik.\n\n"
+            "• Hidrat Modeli: NeqSim CPA ampirik modellerden ayrıştırıldı,\n"
+            "  ayrı satırda '(Önerilen)' olarak gösteriliyor.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version in ("v1.6.0", "v1.6"):
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• NeqSim Entegrasyonu: Equinor NeqSim ile 15 yeni EOS modeli.\n"

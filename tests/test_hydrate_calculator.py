@@ -178,3 +178,54 @@ def test_hydrate_to_display_list():
 
     risk_hamm_row = next(row for row in display_list_si if "Hammerschmidt Riski" in row[0])
     assert risk_hamm_row[1] == "GÜVENLİ"
+
+    # NeqSim CPA not present (was None)
+    neqsim_rows = [r for r in display_list_si if "NeqSim CPA" in r[0]]
+    assert len(neqsim_rows) == 0
+
+
+def test_hydrate_to_display_list_with_neqsim():
+    """Display list should include NeqSim CPA row when t_hydrate_neqsim is set."""
+    hydrate_res = HydrateResults(
+        specific_gravity=0.62,
+        operating_temperature=285.15,
+        operating_pressure=3.0e6,
+        t_hydrate_hammerschmidt=268.15,
+        t_hydrate_motiee=278.15,
+        t_hydrate_towler_mokhatab=280.15,
+        t_hydrate_average=275.48,
+        t_hydrate_neqsim=270.0,
+        risk_neqsim=True,
+        risk_hammerschmidt=False,
+        risk_motiee=True,
+        risk_towler_mokhatab=True,
+        risk_average=True
+    )
+
+    from natural_gas_main.models.calculation_result import (
+        ActualConditionResults, StandardConditionResults
+    )
+
+    actual = ActualConditionResults(
+        temperature=285.15, pressure=3.0e6, density=25.0,
+        molar_mass=0.018, compressibility_factor=0.90,
+        internal_energy=10.0, enthalpy=15.0, entropy=2.0,
+        cp=2.5, cv=1.8,
+    )
+
+    standard = StandardConditionResults(
+        density_std=0.80, specific_gravity=0.62,
+        reference_temperature=288.15, reference_pressure=101325.0,
+    )
+
+    result = CalculationResult(
+        backend_used="SRK", actual=actual, standard=standard,
+        hydrate=hydrate_res,
+    )
+
+    display = result.to_display_list(unit_system="SI")
+    neqsim_row = next(row for row in display if "NeqSim CPA Limit Sıcaklığı (Önerilen)" in row[0])
+    assert "-3.15" in neqsim_row[1]  # 270K → -3.15°C
+
+    risk_row = next(row for row in display if "NeqSim CPA Riski" in row[0])
+    assert risk_row[1] == "RİSK VAR"

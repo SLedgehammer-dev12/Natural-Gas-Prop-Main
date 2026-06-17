@@ -263,11 +263,14 @@ class TestThermoCalculatorNeqSimHydrate:
 
         mock_get_hydrate.assert_called_once_with(simple_mixture, 290.0, 50e5)
         assert result is not None
-        # NeqSim affects the average — all 4 values averaged
+        # NeqSim is no longer averaged with empirical models
         temps = [result.t_hydrate_hammerschmidt, result.t_hydrate_motiee,
-                 result.t_hydrate_towler_mokhatab, 285.0]
+                 result.t_hydrate_towler_mokhatab]
         expected_avg = sum(temps) / len(temps)
         assert abs(result.t_hydrate_average - expected_avg) < 0.01
+        # NeqSim CPA is stored and shown separately
+        assert result.t_hydrate_neqsim == 285.0
+        assert result.risk_neqsim is False  # 290.0 > 285.0 → safe
 
     def test_neqsim_hydrate_skipped_when_unavailable(self, simple_mixture):
         """When NeqSim is unavailable, hydrate should work without NeqSim."""

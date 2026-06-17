@@ -669,7 +669,7 @@ class OutputPanel(ctk.CTkFrame):
         legend = self.phase_ax.legend(loc='best')
         if is_dark:
             for text in legend.get_texts():
-                text.set_color("black")
+                text.set_color("white")
                 
         self.phase_fig.tight_layout()
         self.phase_canvas.draw()

@@ -1,3 +1,28 @@
+# Natural Gas Prop Main v1.6.1
+
+**Tarih:** Haziran 2026
+
+## Hotfix Düzeltmeleri
+
+| # | Hata | Etki |
+|---|------|------|
+| H1 | **AGA8 Panik → UI Kilitlenmesi** | pyaga8 `IterationFail` Rust paniği `BaseException` olarak yakalanıyor. UI donmuyor, Z-karşılaştırma tablosu AGA8 sütunu boş gösteriliyor. |
+| H2 | **TclError Entry Temizleme** | Sıcaklık/basınç alanı silindiğinde konsola hata yağmıyor. |
+| H3 | **DAK Geçersiz Aralık** | Tpr<1.0 için DAK hiç çalıştırılmıyor, gereksiz iterasyon önlendi. |
+| H4 | **Tight Layout Uyarısı** | Küçük pencere boyutlarında matplotlib uyarısı bastırıldı. |
+| H5 | **Koyu Mod Lejant Rengi** | Faz zarfı lejantı siyah→beyaz, okunabilirlik arttı. |
+| H6 | **NeqSim ISO 6976 Sıcaklık** | Referans sıcaklığı kullanıcı seçimine göre dinamik. |
+| H7 | **Hidrat NeqSim Ayrıştırma** | CPA modeli ampirik modellerden ayrı gösteriliyor (Önerilen). |
+
+## Test Altyapısı
+
+| Metrik | v1.6.0 | v1.6.1 |
+|--------|--------|--------|
+| Test sayısı | 641 | **641** |
+| Coverage | %94.92 | **%94.94** |
+
+---
+
 # Natural Gas Prop Main v1.6.0
 
 **Tarih:** Haziran 2026

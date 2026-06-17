@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.6.0",
-  "date": "2026-06-09",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.6.0",
-  "changelog": "- NeqSim entegrasyonu: 15 yeni EOS modeli.\n- Transport properties: viskozite, termal iletkenlik, JT, yuzey gerilimi.\n- NeqSim ISO 6976: HHV/LHV/Wobbe ISO standardi (Stage 0).\n- NeqSim CPA-tabanli hidrat modeli (4. model).\n- 628 test, %94.92 coverage.\n- Gereksinim: Java 11+ ve pip install neqsim>=3.6.1"
+  "version": "v1.6.1",
+  "date": "2026-06-17",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.6.1",
+  "changelog": "- Hotfix v1.6.1: AGA8 Panik korumasi (IterationFail).\n- TclError duzeltmesi (DoubleVar->StringVar).\n- DAK validasyon: Tpr<1.0 onceden engelleniyor.\n- Tight layout uyarisi susturuldu.\n- Koyu mod lejant renk duzeltmesi.\n- NeqSim ISO 6976 sicaklik dinamik.\n- Hidrat CPA ayristirma (Onerilen).\n- 641 test, %94.94 coverage."
 }
