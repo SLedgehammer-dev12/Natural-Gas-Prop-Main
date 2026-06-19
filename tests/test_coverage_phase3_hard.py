@@ -35,6 +35,7 @@ class TestLoggerResolveLogPath:
         expected = Path(test_path)
         assert result == expected
 
+    @pytest.mark.skipif(os.name == "nt", reason="PosixPath cannot be created on Windows")
     def test_relative_path_uses_state_dir(self):
         from natural_gas_main.utils.logger import _resolve_log_path
         with patch("os.name", "posix"):
@@ -43,6 +44,7 @@ class TestLoggerResolveLogPath:
                 assert "NaturalGasProp" in str(result)
                 assert "app.log" in str(result)
 
+    @pytest.mark.skipif(os.name == "nt", reason="PosixPath cannot be created on Windows")
     def test_xdg_state_home(self, monkeypatch):
         monkeypatch.delenv("XDG_STATE_HOME", raising=False)
         monkeypatch.setattr(os, "name", "posix")
