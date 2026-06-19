@@ -37,7 +37,8 @@ class TestGenerateAndSaveContext:
             file_path,
         )
         assert os.path.exists(file_path)
-        content = open(file_path).read()
+        with open(file_path, encoding="utf-8-sig") as f:
+            content = f.read()
         assert "Methane" in content
         assert "Prop" in content
 
