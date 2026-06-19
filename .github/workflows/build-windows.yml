@@ -52,8 +52,8 @@ jobs:
 
       - name: Run tests
         run: |
-          pip install pytest pytest-cov pytest-timeout
-          pytest tests/ --tb=short -x --timeout=60 -k "not ui and not neqsim"
+          pip install pytest pytest-timeout
+          pytest tests/ --tb=short -x --timeout=60 -k "not ui and not neqsim" -p no:cacheprovider
 
       - name: Build Windows EXE
         run: |
