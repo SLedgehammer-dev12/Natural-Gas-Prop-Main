@@ -1,10 +1,16 @@
-﻿from natural_gas_main.models.calculator import COOLPROP_AVAILABLE, ThermoCalculator
+﻿import os
+import sys
+
+from natural_gas_main.models.calculator import COOLPROP_AVAILABLE, ThermoCalculator
 from natural_gas_main.models.gas_data import GasComponent, GasMixture
 
 import pytest
 
 
-pytestmark = pytest.mark.skipif(not COOLPROP_AVAILABLE, reason="CoolProp is not installed")
+pytestmark = pytest.mark.skipif(
+    not COOLPROP_AVAILABLE or sys.platform == "win32",
+    reason="CoolProp is not installed or PosixPath incompatibility on Windows"
+)
 
 
 def test_calculation_fallback_uses_cubic_backend_when_heos_pair_data_is_missing():
