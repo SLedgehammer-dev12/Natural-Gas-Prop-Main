@@ -324,8 +324,9 @@ class TestAga8Calculator:
                 mock_engine.kappa = 1.3
                 mock_engine.w = 400.0
                 mock_pyaga8.Gerg2008.return_value = mock_engine
-                with pytest.raises(ValueError, match="AGA8'de tanınmayan bileşenler"):
-                    calculate_aga8(mixture, 300, 101325, method="GERG-2008")
+                result = calculate_aga8(mixture, 300, 101325, method="GERG-2008")
+                assert result is not None
+                assert result.compressibility_factor == 0.99
 
     def test_normalization_applied(self):
         from natural_gas_main.models.gas_data import GasComponent, GasMixture

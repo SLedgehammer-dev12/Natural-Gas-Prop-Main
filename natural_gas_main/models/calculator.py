@@ -73,6 +73,14 @@ class ThermoCalculator:
         
         self.logger = logging.getLogger(__name__)
         self.z_factor_estimator = StandingKatzZFactor(CP)
+
+    @staticmethod
+    def _air_density(pressure_pa: float, temperature_k: float) -> float:
+        """Calculate air density using CoolProp with ideal gas law fallback."""
+        try:
+            return CP.PropsSI('D', 'T', temperature_k, 'P', pressure_pa, 'Air')
+        except Exception:
+            return pressure_pa / (287.058 * temperature_k)
         
     def calculate_properties(
         self,
@@ -267,7 +275,7 @@ class ThermoCalculator:
             Ordered list of backend names
         """
         if self._is_neqsim_backend(preferred) and not NEQSIM_AVAILABLE:
-            backends = ["GERG-2008"]
+            backends = []
         else:
             backends = [preferred]
 
@@ -382,7 +390,7 @@ class ThermoCalculator:
                     cv=res.cv,
                     ppr=ppr, tpr=tpr, valid=True, warning=None
                 ))
-            except BaseException as e:
+            except Exception as e:
                 self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
 
         # 2.5 Add NeqSim backends for comparison
@@ -494,10 +502,7 @@ class ThermoCalculator:
             z_std = std_ann10.z_factor if std_ann10 is not None else 1.0
             rho_std = self._density_from_z(standard_P, standard_T, pseudo.molar_mass_kg_mol, z_std)
 
-            try:
-                rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
-            except Exception:
-                rho_air = standard_P / (287.058 * standard_T)
+            rho_air = self._air_density(standard_P, standard_T)
             sg = rho_std / rho_air
 
             actual_results = ActualConditionResults(
@@ -625,11 +630,7 @@ class ThermoCalculator:
         try:
             std_res = calculate_aga8(mixture, standard_T, standard_P, backend)
             standard_results.density_std = std_res.density
-            rho_air = standard_P / (287.058 * standard_T)
-            try:
-                rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
-            except Exception:
-                pass
+            rho_air = self._air_density(standard_P, standard_T)
             standard_results.specific_gravity = std_res.density / rho_air
         except Exception as e:
             self.logger.warning(f"Standard condition calculation failed with {backend}: {e}")
@@ -642,8 +643,8 @@ class ThermoCalculator:
                 pe_backend = "SRK"
             state = self._create_state(mixture, temperature_k, pressure_pa, pe_backend)
             phase_envelope = self._calculate_phase_envelope(state, pe_backend)
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug(f"Phase envelope skipped: {e}")
 
         return actual_results, standard_results, phase_envelope
 
@@ -683,10 +684,7 @@ class ThermoCalculator:
         try:
             std_actual, _ = calculate_neqsim(mixture, standard_T, standard_P, backend)
             standard_results.density_std = std_actual.density
-            try:
-                rho_air = CP.PropsSI('D', 'T', standard_T, 'P', standard_P, 'Air')
-            except Exception:
-                rho_air = standard_P / (287.058 * standard_T)
+            rho_air = self._air_density(standard_P, standard_T)
             standard_results.specific_gravity = std_actual.density / rho_air
         except Exception as e:
             self.logger.warning(f"NeqSim standard condition failed with {backend}: {e}")
@@ -780,7 +778,7 @@ class ThermoCalculator:
                 return None
 
             # Calculate temperatures in Fahrenheit
-            # 1. Hammerschmidt (1934)
+            # 1. Hammerschmidt (1934) — SG-duyarsız; SG≠0.6 için ±3-5°F hata payı vardır
             t_f_hammerschmidt = 8.9 * (p_psia ** 0.285) - 38.2
 
             # 2. Motiee (1991)
@@ -814,8 +812,8 @@ class ThermoCalculator:
             if NEQSIM_AVAILABLE and mixture is not None:
                 try:
                     t_k_neqsim = get_neqsim_hydrate_temperature(mixture, temperature_k, pressure_pa)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug(f"NeqSim hydrate calculation failed: {e}")
 
             # Average of the three empirical models only
             temps = [t_k_hammerschmidt, t_k_motiee, t_k_towler_mokhatab]
@@ -918,13 +916,26 @@ class ThermoCalculator:
             if not T_array or not P_array:
                 return None
 
-            cricondentherm_t = max(T_array)
+            # Detect multi-lobed envelopes by temperature discontinuity
+            lobes = []
+            current_lobe = [(T_array[0], P_array[0])]
+            for i in range(1, len(T_array)):
+                if abs(T_array[i] - T_array[i - 1]) > 10.0:
+                    lobes.append(current_lobe)
+                    current_lobe = []
+                current_lobe.append((T_array[i], P_array[i]))
+            if current_lobe:
+                lobes.append(current_lobe)
 
-            # Find the pressure at cricondentherm (not just max(P_array))
+            primary_lobe = max(lobes, key=lambda l: max(p[0] for p in l) - min(p[0] for p in l))
+            T_primary, P_primary = zip(*primary_lobe)
+
+            cricondentherm_t = max(T_primary)
+
             cricondenbar_p: Optional[float] = None
-            max_p_idx = P_array.index(max(P_array))
-            cricondenbar_t = T_array[max_p_idx]
-            cricondenbar_p = P_array[max_p_idx]
+            max_p_idx = P_primary.index(max(P_primary))
+            cricondenbar_t = T_primary[max_p_idx]
+            cricondenbar_p = P_primary[max_p_idx]
 
             # Try to extract critical point from CoolProp state
             critical_t: Optional[float] = None
@@ -932,8 +943,8 @@ class ThermoCalculator:
             try:
                 critical_t = state.keyed_output(CP.iT_critical)
                 critical_p = state.keyed_output(CP.iP_critical)
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Critical point extraction failed: {e}")
 
             return PhaseEnvelopeData(
                 temperature_k=T_array,
@@ -1062,13 +1073,10 @@ class ThermoCalculator:
         rho_std = state_std.rhomass()
         
         # Calculate specific gravity (relative to air at same conditions)
-        try:
-            # We must calculate air density at the SAME standard conditions
-            # to be scientifically correct for SG
-            rho_air = CP.PropsSI('D', 'T', T_std, 'P', P_std, 'Air')
-        except Exception:
-            # Ideal Gas Law for Air: R_air = 287.058 J/(kg.K)
-            rho_air = P_std / (287.058 * T_std)
+        rho_air = self._air_density(P_std, T_std)
+        if rho_air != P_std / (287.058 * T_std):
+            self.logger.debug(f"Air density at standard conditions: {rho_air:.3f} kg/m³")
+        else:
             self.logger.warning(
                 f"Could not get air density from CoolProp, using Ideal Gas Law "
                 f"(rho={rho_air:.3f} kg/m3 for T={T_std}K, P={P_std}Pa)"

@@ -114,12 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.6.1 - Profesyonel Sürüm\n\n"
-        "HESAPLAMA MOTORLARI:\n"
-        "• CoolProp (HEOS, SRK, PR) - Termodinamik özellikler\n"
-        "• pyaga8 (GERG-2008, AGA8-Detail) - AGA8 standardı\n"
-        f"• NeqSim (15 EOS) - {neqsim_status}\n\n"
-        "v1.6.1 sürümü: NeqSim entegrasyonu, 15 yeni EOS,\n"
+        "Sürüm v1.7.0 - Profesyonel Sürüm\n\n"
+
+        "v1.7.0 sürümü: Kod kalitesi iyileştirmeleri, exception güvenliği,\n"
         "transport properties, CPA hidrat modeli.\n\n"
         "© 2026 Kompresör Pompa"
     )
@@ -194,7 +191,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm v1.6.1")
+    dialog.title(f"Yenilikler - Sürüm {version}")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -206,23 +203,31 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.6.1",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM {version}",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.6.1":
+    if version == "v1.7.0":
         info_text = (
             "📋 BU SÜRÜMDEKİ DÜZELTMELER:\n\n"
-            "• AGA8 Çökme Hatası Giderildi: pyaga8 IterationFail paniği artık\n"
-            "  yakalanıyor, uygulama donmuyor. macOS/Windows kararlılık arttı.\n\n"
-            "• Sıcaklık/Basınç Girişi: Alan temizlendiğinde TclError hatası artık yok.\n\n"
-            "• DAK Z-Faktörü: Geçersiz aralık (Tpr<1.0) önceden tespit ediliyor,\n"
-            "  gereksiz iterasyon ve yanıltıcı değerler önlendi.\n\n"
-            "• Pasta Grafiği: Küçük pencere boyutlarında Tight Layout uyarısı sessize alındı.\n\n"
-            "• Koyu Mod Lejant: Faz zarfı lejant yazı rengi siyah→beyaz.\n\n"
-            "• NeqSim ISO 6976: Referans sıcaklığı kullanıcı seçimine göre dinamik.\n\n"
-            "• Hidrat Modeli: NeqSim CPA ampirik modellerden ayrıştırıldı,\n"
-            "  ayrı satırda '(Önerilen)' olarak gösteriliyor.\n\n"
+            "• Exception Güvenliği: Tüm 'except BaseException' ve 'except: pass'\n"
+            "  yapıları temizlendi. Ctrl+C artık çalışır durumda.\n\n"
+            "• Thread Güvenliği: Update checker arka plan thread'inde çalışıyor,\n"
+            "  UI donma sorunu giderildi. Logger thread-safe hale getirildi.\n\n"
+            "• CI Kalitesi: GitHub Actions pipeline'ına test adımı eklendi,\n"
+            "  pip önbellekleme ile build süresi ~5 dk kısaltıldı.\n\n"
+            "• Termodinamik: isohexane → 2-methylpentane mapping düzeltildi.\n"
+            "  ISO 6976 artık SRK yerine GERG-2008 kullanıyor.\n\n"
+            "• Çok Loblu Faz Zarfı: Birden fazla lobu olan faz diyagramlarında\n"
+            "  cricondenbar/cricondentherm doğru tespit ediliyor.\n\n"
+            "• Hidrat Modeli: Yakınsama kontrolü eklendi.\n\n"
+            "• AGA8 Eser Bileşen: %95+ eşlenmiş bileşen varsa eser bileşenler\n"
+            "  tolere ediliyor, hata yerine rescale yapılıyor.\n\n"
+            "• Kod Kalitesi: 4x tekrar eden hava yoğunluğu helper'a çekildi.\n"
+            "  Sutton SG_hc clamp uyarısı loglanıyor.\n\n"
+            "• Tema/Style: Pasta grafiği, TreeView stilleri tema değişince\n"
+            "  otomatik güncelleniyor. Ölü widget'lar temizlendi.\n\n"
+            "• Coverage threshold %70'e yükseltildi.\n\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
     elif version in ("v1.6.0", "v1.6"):

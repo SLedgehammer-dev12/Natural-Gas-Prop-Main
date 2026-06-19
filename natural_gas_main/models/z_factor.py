@@ -11,12 +11,15 @@ for natural hydrocarbon gases", Journal of Petroleum Science and Engineering,
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 import math
 from functools import lru_cache
 from typing import Dict, List, Optional, Any
 
 from natural_gas_main.models.gas_data import GasMixture
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -199,7 +202,13 @@ class StandingKatzZFactor:
         if y_hc <= 0:
             raise ValueError("Hydrocarbon fraction must be > 0 for Sutton correlation")
 
-        sg_hc = max(0.55, (sg_gas - 0.9672 * y_n2 - 1.5195 * y_co2 - 1.1767 * y_h2s) / y_hc)
+        raw_sg_hc = (sg_gas - 0.9672 * y_n2 - 1.5195 * y_co2 - 1.1767 * y_h2s) / y_hc
+        if raw_sg_hc < 0.55:
+            _logger.debug(
+                f"Sutton SG_hc clamped to 0.55 (raw={raw_sg_hc:.3f}); "
+                f"Tpc/Ppc may be overestimated for light gas"
+            )
+        sg_hc = max(0.55, raw_sg_hc)
 
         tpc_hc_f = 169.2 + 349.5 * sg_hc - 74.0 * sg_hc ** 2
         ppc_hc_psi = 756.8 - 131.0 * sg_hc - 3.6 * sg_hc ** 2

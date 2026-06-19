@@ -101,25 +101,7 @@ class OutputPanel(ctk.CTkFrame):
         )
         unit_combo.pack(side=tk.LEFT)
         
-        # Apply dark theme styling to Treeview (since it's still a ttk widget)
-        style = ttk.Style()
-        bg_color = "#2b2b2b" if ctk.get_appearance_mode() == "Dark" else "#f0f0f0"
-        fg_color = "white" if ctk.get_appearance_mode() == "Dark" else "black"
-        sel_bg = "#1f538d"
-        
-        style.theme_use("default")
-        style.configure("Treeview",
-                        background=bg_color,
-                        foreground=fg_color,
-                        rowheight=25,
-                        fieldbackground=bg_color)
-        style.map('Treeview', background=[('selected', sel_bg)])
-        style.configure("Treeview.Heading",
-                        background="#3c3c3c" if bg_color == "#2b2b2b" else "#d9d9d9",
-                        foreground=fg_color,
-                        relief="flat")
-        style.map("Treeview.Heading",
-                  background=[('active', "#4c4c4c" if bg_color == "#2b2b2b" else "#e0e0e0")])
+        self._update_treeview_style()
 
         # TreeView with columns
         cols = ("Özellik", "Değer", "Birim")
@@ -338,20 +320,20 @@ class OutputPanel(ctk.CTkFrame):
                 with panel._log_lock:
                     panel.log_records.append((msg, level, record.levelno))
                 
-                # Check if should display based on current filter
-                selected_level = panel.log_level_var.get()
-                min_level = panel.level_map.get(selected_level, 0)
-                
-                if record.levelno >= min_level:
-                    def append():
+                def append():
+                    # Check filter on main thread (tkinter-safe)
+                    selected_level = panel.log_level_var.get()
+                    min_level = panel.level_map.get(selected_level, 0)
+                    
+                    if record.levelno >= min_level:
                         self.text_widget.configure(state=tk.NORMAL)
                         self.text_widget.insert(tk.END, msg + '\n', level)
                         if self.auto_scroll_var.get():
                             self.text_widget.see(tk.END)
                         self.text_widget.configure(state=tk.DISABLED)
-                    
-                    # Schedule on main thread
-                    self.text_widget.after(0, append)
+                
+                # Schedule everything on main thread
+                self.text_widget.after(0, append)
         
         # Create and add handler
         self.text_handler = TextHandler(self.log_text, self.auto_scroll_var)
@@ -610,8 +592,31 @@ class OutputPanel(ctk.CTkFrame):
         except tk.TclError:
             pass
 
+    def _update_treeview_style(self):
+        """Apply dark/light theme styling to Treeview widget."""
+        style = ttk.Style()
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        bg_color = "#2b2b2b" if is_dark else "#f0f0f0"
+        fg_color = "white" if is_dark else "black"
+        sel_bg = "#1f538d"
+        
+        style.theme_use("default")
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=fg_color,
+                        rowheight=25,
+                        fieldbackground=bg_color)
+        style.map('Treeview', background=[('selected', sel_bg)])
+        style.configure("Treeview.Heading",
+                        background="#3c3c3c" if is_dark else "#d9d9d9",
+                        foreground=fg_color,
+                        relief="flat")
+        style.map("Treeview.Heading",
+                  background=[('active', "#4c4c4c" if is_dark else "#e0e0e0")])
+
     def _update_theme_colors(self):
-        """Update phase envelope figure colours when appearance mode changes."""
+        """Update phase envelope figure and Treeview colours when appearance mode changes."""
+        self._update_treeview_style()
         is_dark = ctk.get_appearance_mode() == "Dark"
         bg_col = '#2b2b2b' if is_dark else '#f0f0f0'
         fg_col = 'white' if is_dark else 'black'

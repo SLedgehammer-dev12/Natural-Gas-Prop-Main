@@ -35,6 +35,7 @@ a = Analysis(
         'pyaga8',
         'customtkinter',
         'packaging',
+        'pydantic',
         'neqsim',
     ],
     hookspath=[],
@@ -42,7 +43,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -83,8 +84,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.6.1',
-            'CFBundleVersion': '1.6.1.0',
+            'CFBundleShortVersionString': '1.7.0',
+            'CFBundleVersion': '1.7.0.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',

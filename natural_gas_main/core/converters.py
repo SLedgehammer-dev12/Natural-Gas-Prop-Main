@@ -145,9 +145,9 @@ def convert_pressure_to_Pa(
         elif unit_str == "bar(g)" or unit_str == PressureUnit.BAR_GAUGE:
             return (value + config.P_ATM_BAR) * 1e5
         elif unit_str == "psi(a)" or unit_str == PressureUnit.PSI_ABSOLUTE:
-            return value * 6894.76
+            return value * 6894.757
         elif unit_str == "psi(g)" or unit_str == PressureUnit.PSI_GAUGE:
-            return (value + config.P_ATM_PSI) * 6894.76
+            return (value + config.P_ATM_PSI) * 6894.757
         elif unit_str == "MPa" or unit_str == PressureUnit.MPA:
             return value * 1e6
         elif unit_str == "atm" or unit_str == PressureUnit.ATM:
@@ -191,9 +191,9 @@ def convert_pressure_from_Pa(
     elif unit_str == "bar(g)" or unit_str == PressureUnit.BAR_GAUGE:
         return value_pa / 1e5 - config.P_ATM_BAR
     elif unit_str == "psi(a)" or unit_str == PressureUnit.PSI_ABSOLUTE:
-        return value_pa / 6894.76
+        return value_pa / 6894.757
     elif unit_str == "psi(g)" or unit_str == PressureUnit.PSI_GAUGE:
-        return value_pa / 6894.76 - config.P_ATM_PSI
+        return value_pa / 6894.757 - config.P_ATM_PSI
     elif unit_str == "MPa" or unit_str == PressureUnit.MPA:
         return value_pa / 1e6
     elif unit_str == "atm" or unit_str == PressureUnit.ATM:

@@ -108,15 +108,12 @@ def calculate_aga8(
             f"Atlanan bileşenler: {', '.join(unmapped_gases)}. AGA8 kullanılamaz."
         )
 
-    if unmapped_gases:
+    if unmapped_gases and sum_fractions >= 0.95:
         logger.warning(
-            f"AGA8'de tanınmayan bileşenler: {', '.join(unmapped_gases)}. "
-            f"AGA8 hesaplaması yapılamaz, HEOS/SRK/PR yöntemine geçiliyor."
+            f"AGA8'de tanınmayan eser bileşenler: {', '.join(unmapped_gases)}. "
+            f"Bunlar yoksayılacak, kalan oranlar yeniden ölçeklenecek."
         )
-        raise ValueError(
-            f"AGA8'de tanınmayan bileşenler: {', '.join(unmapped_gases)}. "
-            f"AGA8 kullanılamaz, alternatif yönteme geçiliyor."
-        )
+        # Do NOT raise — rescale below like the normal 1e-5 path
 
     if abs(sum_fractions - 1.0) > 1e-5:
         for gas in mixture.components:

@@ -92,6 +92,22 @@ class ThermoApp(ctk.CTk):
         ):
             self.quit()
     
+    @staticmethod
+    def _load_gas_list_from_coolprop():
+        """Load gas list using CoolProp (split for testability)."""
+        import CoolProp.CoolProp as CP
+        fluids = CP.get_global_param_string("FluidsList")
+        if fluids:
+            all_gases = [f.strip() for f in fluids.split(',') if f.strip()]
+            natural_gases = [g.lower() for g in config.NATURAL_GAS_FOCUS_LIST]
+            gas_list = sorted([f for f in all_gases if f.lower() in natural_gases])
+            display_aliases = {"n-Propane": "Propane"}
+            gas_list = sorted({display_aliases.get(g, g) for g in gas_list})
+            if gas_list:
+                return gas_list
+            return sorted(all_gases)
+        return None
+
     def _load_gas_list(self) -> list:
         """
         Load gas list from CoolProp or use fallback.
@@ -101,7 +117,10 @@ class ThermoApp(ctk.CTk):
         """
         if COOLPROP_AVAILABLE:
             try:
-                import CoolProp.CoolProp as CP
+                gas_list = self._load_gas_list_from_coolprop()
+                if gas_list:
+                    self.logger.info(f"Loaded {len(gas_list)} focused gases from CoolProp")
+                    return gas_list
                 fluids = CP.get_global_param_string("FluidsList")
                 if fluids:
                     all_gases = [f.strip() for f in fluids.split(',') if f.strip()]
@@ -120,8 +139,6 @@ class ThermoApp(ctk.CTk):
                     if not gas_list: # Fallback if filter is too strict
                         gas_list = sorted(all_gases)
 
-                    self.logger.info(f"Loaded {len(gas_list)} focused gases from CoolProp")
-                    return gas_list
             except Exception as e:
                 self.logger.error(f"Failed to load CoolProp gas list: {e}")
         
@@ -147,11 +164,11 @@ class ThermoApp(ctk.CTk):
         file_menu.add_separator()
         file_menu.add_command(label="Rapor Kaydet", command=self._on_save_report)
         file_menu.add_separator()
-        file_menu.add_command(label="Çıkış", command=self.quit)
+        file_menu.add_command(label="Çıkış", command=self._on_close)
         
         # Keyboard shortcuts
-        self.bind_all("<Control-o>", lambda e: self._on_load_data())
-        self.bind_all("<Control-s>", lambda e: self._on_save_data())
+        self.bind("<Control-o>", lambda e: self._on_load_data())
+        self.bind("<Control-s>", lambda e: self._on_save_data())
         
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -267,7 +284,7 @@ class ThermoApp(ctk.CTk):
         )
         status_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
         
-        self.progress_bar = ctk.CTkProgressBar(status_frame, mode='indeterminate', width=150)
+        # self.progress_bar removed — unused dead widget
     
     def _show_welcome(self):
         """Show welcome/new features message if not disabled."""
@@ -287,16 +304,18 @@ class ThermoApp(ctk.CTk):
         # Update plots and other theme-dependent elements
         if hasattr(self, 'output_panel'):
             self.output_panel._update_theme_colors()
-            self.output_panel._on_unit_change()
+            if self.output_panel.current_result is not None:
+                self.output_panel._on_unit_change()
             
     def _change_color_theme(self, new_theme: str):
-        """Change application color theme (Requires restart for full effect usually, but let's try)."""
-        # Note: ctk.set_default_color_theme usually needs to be called BEFORE mainloop
-        # But we can inform the user.
-        messagebox.showinfo("Tema Değişikliği", "Renk teması değişikliği uygulandı. Bazı pencereler için programın yeniden başlatılması gerekebilir.")
+        """Change application color theme (requires restart for full effect)."""
         ctk.set_default_color_theme(new_theme)
-        # Persist preference
         preferences.set_preference("ctk_color_theme", new_theme)
+        messagebox.showinfo(
+            "Tema Değişikliği",
+            "Renk teması kaydedildi. Tamamen uygulanması için "
+            "programı yeniden başlatmanız gerekmektedir."
+        )
     
     # Event handlers
     
@@ -408,7 +427,7 @@ class ThermoApp(ctk.CTk):
             # Send success to queue
             self.result_queue.put(("success", (result, used_backend, inputs)))
             
-        except BaseException as e:
+        except Exception as e:
             # Send error to queue
             self.result_queue.put(("error", e))
     
@@ -561,7 +580,7 @@ class ThermoApp(ctk.CTk):
                 # Cleanup temp file
                 if plot_img and os.path.exists(plot_img):
                     try: os.remove(plot_img)
-                    except: pass
+                    except Exception: pass
             else:
                 # Fallback to Text
                 ReportGenerator.generate_and_save(
@@ -644,35 +663,42 @@ class ThermoApp(ctk.CTk):
             dialogs.show_error("Yükleme Hatası", f"Beklenmeyen hata: {e}")
             
     def _check_for_updates_manual(self):
-        """Check for updates manually triggered by user."""
-        try:
-            self.status_var.set("Güncellemeler kontrol ediliyor...")
-            self.configure(cursor="watch")
-            self.update();
+        """Check for updates manually triggered by user (runs in background thread)."""
+        self.status_var.set("Güncellemeler kontrol ediliyor...")
+        self.configure(cursor="watch")
 
-            checker = UpdateChecker()
-            has_update, update_info, status_msg = checker.check_for_updates()
+        def _check():
+            try:
+                checker = UpdateChecker()
+                has_update, update_info, status_msg = checker.check_for_updates()
+                self.after(0, self._on_update_check_result, has_update, update_info, status_msg)
+            except Exception as e:
+                self.after(0, self._on_update_check_error, e)
 
-            self.configure(cursor="")
+        threading.Thread(target=_check, daemon=True).start()
 
-            if has_update and update_info:
-                msg = (
-                    f"✨ YENI SÜRÜM MEVCUT!\n\n"
-                    f"Versiyon: {update_info.get('version')}\n"
-                    f"Tarih: {update_info.get('date')}\n\n"
-                    f"Değişiklikler:\n{update_info.get('changelog', '-')}\n\n"
-                    f"İndirme sayfasına gitmek ister misiniz?"
-                )
-                if messagebox.askyesno("Güncelleme Mevcut", msg):
-                    checker.open_download_page(update_info.get('download_url'))
-                self.status_var.set("Hazır.")
-            elif status_msg:
-                messagebox.showinfo("Güncelleme", status_msg)
-                self.status_var.set(status_msg)
-            else:
-                self.status_var.set("Hazır.")
+    def _on_update_check_result(self, has_update, update_info, status_msg):
+        """Handle update check result on main thread."""
+        self.configure(cursor="")
+        if has_update and update_info:
+            msg = (
+                f"✨ YENI SÜRÜM MEVCUT!\n\n"
+                f"Versiyon: {update_info.get('version')}\n"
+                f"Tarih: {update_info.get('date')}\n\n"
+                f"Değişiklikler:\n{update_info.get('changelog', '-')}\n\n"
+                f"İndirme sayfasına gitmek ister misiniz?"
+            )
+            if messagebox.askyesno("Güncelleme Mevcut", msg):
+                UpdateChecker().open_download_page(update_info.get('download_url'))
+            self.status_var.set("Hazır.")
+        elif status_msg:
+            messagebox.showinfo("Güncelleme", status_msg)
+            self.status_var.set(status_msg)
+        else:
+            self.status_var.set("Hazır.")
 
-        except Exception as e:
-            self.configure(cursor="")
-            self.logger.error(f"Manual update check failed: {e}")
-            self.status_var.set("Güncelleme kontrolü başarısız.")
+    def _on_update_check_error(self, error: Exception):
+        """Handle update check error on main thread."""
+        self.configure(cursor="")
+        self.logger.error(f"Manual update check failed: {error}")
+        self.status_var.set("Güncelleme kontrolü başarısız.")

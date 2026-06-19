@@ -8,7 +8,7 @@ include pyproject.toml
 include requirements.txt
 include requirements-dev.txt
 include tests/fixtures/*.ngp
-recursive-include tests *.py
+# recursive-include tests *.py — excluded from pip package
 recursive-include patches *.py
 prune __pycache__
 prune .mypy_cache

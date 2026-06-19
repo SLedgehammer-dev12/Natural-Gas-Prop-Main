@@ -40,7 +40,7 @@ NEQSIM_GAS_MAPPING: Dict[str, str] = {
     "isopentane": "isopentane",
     "neopentane": "neopentane",
     "n-hexane": "n-hexane",
-    "isohexane": "n-hexane",
+    "isohexane": "2-methylpentane",
     "n-heptane": "n-heptane",
     "n-octane": "n-octane",
     "n-nonane": "n-nonane",
@@ -292,32 +292,32 @@ def calculate_neqsim(
         if is_multiphase:
             try:
                 fluid.setMultiPhaseCheck(True)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f"setMultiPhaseCheck(True) failed: {exc}")
 
         if is_h2_enhanced:
             try:
                 fluid.useHydrogenEnhancedModel()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f"useHydrogenEnhancedModel() failed: {exc}")
 
         try:
             fluid.createDatabase(True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"createDatabase(True) failed: {exc}")
 
         ops = _jneqsim.thermodynamicoperations.ThermodynamicOperations(fluid)
         ops.TPflash()
 
         try:
             fluid.initProperties()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"initProperties() failed: {exc}")
 
         try:
             fluid.initPhysicalProperties()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"initPhysicalProperties() failed: {exc}")
 
         phase = fluid.getPhase(0)
 
@@ -330,7 +330,8 @@ def calculate_neqsim(
             z_factor = float(fluid.getZ())
             if math.isnan(z_factor) or z_factor <= 0:
                 z_factor = float(phase.getZ())
-        except Exception:
+        except Exception as exc:
+            logger.debug(f"fluid.getZ() failed: {exc}")
             z_factor = float(phase.getZ())
 
         h = float(phase.getEnthalpy("kJ/kg")) if hasattr(phase, 'getEnthalpy') else float(fluid.getEnthalpy("kJ/kg"))
@@ -346,14 +347,14 @@ def calculate_neqsim(
                 kappa = float(phase.getGamma())
             elif cp > 0 and cv > 0:
                 kappa = cp / cv
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"isentropic exponent extraction failed: {exc}")
 
         speed = None
         try:
             speed = float(phase.getSoundSpeed())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"sound speed extraction failed: {exc}")
 
         # --- Transport properties ---
         transport = TransportProperties()
@@ -361,26 +362,26 @@ def calculate_neqsim(
         try:
             vis = float(phase.getViscosity("cP"))
             transport.viscosity_cp = vis if vis > 0 else None
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"viscosity extraction failed: {exc}")
 
         try:
             tc = float(phase.getThermalConductivity("W/mK"))
             transport.thermal_conductivity = tc if tc > 0 else None
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"thermal conductivity extraction failed: {exc}")
 
         try:
             jt = float(phase.getJouleThomsonCoefficient())
             transport.joule_thomson_coefficient = jt
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"Joule-Thomson extraction failed: {exc}")
 
         try:
             st = float(fluid.getInterphaseProperties().getSurfaceTension(0, 1))
             transport.surface_tension = st if st > 0 else None
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"surface tension extraction failed: {exc}")
 
         # --- Phase info for multiphase (CPA) ---
         transport.has_aqueous_phase = False
@@ -388,8 +389,8 @@ def calculate_neqsim(
         try:
             transport.has_aqueous_phase = fluid.hasPhaseType("aqueous")
             transport.has_liquid_hc_phase = fluid.hasPhaseType("oil")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(f"phase type detection failed: {exc}")
 
         actual = ActualConditionResults(
             temperature=temperature_k,
@@ -438,7 +439,7 @@ def get_neqsim_iso6976(mixture, temperature_ref_k: float = 288.15) -> Optional[D
     try:
         from neqsim.thermo import fluid as nqfluid, TPflash as nqTPflash
 
-        nqf = nqfluid("srk")
+        nqf = nqfluid("gerg2008")
         nqf.setTemperature(temperature_ref_k - 273.15, "C")
         nqf.setPressure(1.01325, "bara")
 
@@ -502,9 +503,17 @@ def get_neqsim_hydrate_temperature(
         fluid.setMultiPhaseCheck(True)
 
         ops = _jneqsim.thermodynamicoperations.ThermodynamicOperations(fluid)
+        initial_temp = float(fluid.getTemperature())
         ops.hydrateFormationTemperature()
+        final_temp = float(fluid.getTemperature())
 
-        return float(fluid.getTemperature())
+        if abs(final_temp - initial_temp) < 0.01:
+            logger.debug(
+                f"Hidrat sıcaklığı yakınsamadı (T={initial_temp:.2f}K → {final_temp:.2f}K)"
+            )
+            return None
+
+        return final_temp
     except Exception as e:
         logger.warning(f"NeqSim hidrat sıcaklığı hesaplanamadı: {e}")
         return None

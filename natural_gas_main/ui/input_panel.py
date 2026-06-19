@@ -79,7 +79,7 @@ class InputPanel(ctk.CTkFrame):
         # Search box
         ctk.CTkLabel(left_frame, text="Gaz Ara:").pack(anchor="w")
         self.search_var = tk.StringVar()
-        self.search_var.trace("w", self._on_gas_search)
+        self.search_var.trace_add("write", self._on_gas_search)
         search_entry = ctk.CTkEntry(left_frame, textvariable=self.search_var)
         search_entry.pack(fill=tk.X, pady=(0, 5))
         
@@ -202,9 +202,7 @@ class InputPanel(ctk.CTkFrame):
         self.pie_fig = Figure(figsize=(3, 3), dpi=80)
         self.pie_ax = self.pie_fig.add_subplot(111)
 
-        bg_col = '#2b2b2b' if ctk.get_appearance_mode() == "Dark" else '#f0f0f0'
-        self.pie_fig.patch.set_facecolor(bg_col)
-        self.pie_ax.set_facecolor(bg_col)
+        self._update_pie_bg()
 
         self.pie_canvas = FigureCanvasTkAgg(self.pie_fig, master=pie_frame)
         self.pie_canvas.draw()
@@ -538,27 +536,48 @@ class InputPanel(ctk.CTkFrame):
     
     # Public methods for getting inputs
     
+    def _update_pie_bg(self):
+        """Update pie chart background to match current theme."""
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        bg_col = '#2b2b2b' if is_dark else '#f0f0f0'
+        self.pie_fig.patch.set_facecolor(bg_col)
+        self.pie_ax.set_facecolor(bg_col)
+
     def _on_standard_change(self, event=None):
-        """Handle standard selection change."""
+        """Handle standard selection change and sync T/P fields."""
         selected = self.standard_var.get()
         
         if selected in config.STANDARD_CONDITIONS:
-            # Update info label
             params = config.STANDARD_CONDITIONS[selected]
             t_val = params["T"]
             p_val = params["P"]
             
-            # Helper to format meaningful text
             t_c = t_val - 273.15
             p_kpa = p_val / 1000.0
-            p_psi = p_val / 6894.76
+            p_psi = p_val / 6894.757
             
             info_text = f"Referans: {t_c:.2f}°C, {p_kpa:.3f} kPa ({p_psi:.3f} psi)"
             self.std_info_label.configure(text=info_text)
-            
-            # Auto-update conditions if user hasn't manually modified them yet 
-            # (Optional: for now we just show info, maybe we can add a checkbox "Sync conditions")
-            # Or better: We set these as the "Standard" parameters that passed to calculator
+
+            temp_unit = self.temp_unit_var.get()
+            if temp_unit == "°C":
+                self.temp_var.set(f"{t_c:.2f}")
+            elif temp_unit == "°F":
+                self.temp_var.set(f"{t_c * 9 / 5 + 32:.2f}")
+            elif temp_unit == "K":
+                self.temp_var.set(f"{t_val:.2f}")
+
+            press_unit = self.press_unit_var.get()
+            if "bar" in press_unit:
+                self.press_var.set(f"{p_val / 1e5:.5f}")
+            elif press_unit == "kPa":
+                self.press_var.set(f"{p_val / 1000:.5f}")
+            elif press_unit == "MPa":
+                self.press_var.set(f"{p_val / 1e6:.5f}")
+            elif "psi" in press_unit:
+                self.press_var.set(f"{p_val / 6894.757:.5f}")
+            elif press_unit == "atm":
+                self.press_var.set(f"{p_val / 101325:.5f}")
         else:
             self.std_info_label.configure(text="Özel tanımlı standart koşullar")
 
@@ -748,7 +767,7 @@ class InputPanel(ctk.CTkFrame):
         for gas_name, row in self.comp_rows.items():
             try:
                 fraction = float(row['var'].get().replace(',','.'))
-            except: fraction = 0.0
+            except Exception: fraction = 0.0
             composition.append({
                 "name": gas_name,
                 "fraction": fraction

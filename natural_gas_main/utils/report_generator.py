@@ -284,15 +284,15 @@ class ReportGenerator:
         
         # Header
         pdf.set_fill_color(240, 240, 240)
-        pdf.cell(0, 15, "DOĞAL GAZ ÖZELLİKLERİ HESAPLAMA RAPORU", ln=True, align='C', fill=True)
+        pdf.cell(0, 15, "DOĞAL GAZ ÖZELLİKLERİ HESAPLAMA RAPORU", new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
         pdf.set_font(font_family, "", 10)
-        pdf.cell(0, 8, f"Rapor Tarihi: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='R')
+        pdf.cell(0, 8, f"Rapor Tarihi: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", new_x="LMARGIN", new_y="NEXT", align='R')
         pdf.ln(5)
         
         # Section 1: Inputs
         pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141) # Dark Blue
-        pdf.cell(0, 10, "1. GİRİLEN PARAMETRELER", ln=True)
+        pdf.cell(0, 10, "1. GİRİLEN PARAMETRELER", new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0, 0, 0)
         pdf.set_font(font_family, "", 10)
         
@@ -307,25 +307,25 @@ class ReportGenerator:
             
         for key, val in input_data:
             pdf.cell(50, 8, f"{key}:", border='B')
-            pdf.cell(0, 8, str(val), border='B', ln=True)
+            pdf.cell(0, 8, str(val), border='B', new_x="LMARGIN", new_y="NEXT")
             
         pdf.ln(5)
         
         # Section 2: Composition Table
         pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141)
-        pdf.cell(0, 10, "2. GAZ KOMPOZİSYONU", ln=True)
+        pdf.cell(0, 10, "2. GAZ KOMPOZİSYONU", new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0, 0, 0)
         pdf.set_font(font_family, "B", 10)
         
         # Table Header
         pdf.cell(90, 8, "Bileşen", border=1, fill=True)
-        pdf.cell(0, 8, "Oran (%)", border=1, fill=True, ln=True, align='C')
+        pdf.cell(0, 8, "Oran (%)", border=1, fill=True, new_x="LMARGIN", new_y="NEXT", align='C')
         
         pdf.set_font(font_family, "", 10)
         for gas, frac in gas_composition:
             pdf.cell(90, 8, f" {gas}", border=1)
-            pdf.cell(0, 8, f"{frac:>8.4f}", border=1, ln=True, align='C')
+            pdf.cell(0, 8, f"{frac:>8.4f}", border=1, new_x="LMARGIN", new_y="NEXT", align='C')
             
         pdf.ln(10)
         
@@ -346,14 +346,14 @@ class ReportGenerator:
             
         pdf.set_font(font_family, "B", 12)
         pdf.set_text_color(31, 83, 141)
-        pdf.cell(0, 10, "3. HESAPLAMA SONUÇLARI", ln=True)
+        pdf.cell(0, 10, "3. HESAPLAMA SONUÇLARI", new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0, 0, 0)
         
         # Results Table
         pdf.set_font(font_family, "B", 10)
         pdf.cell(100, 8, "Özellik", border=1, fill=True)
         pdf.cell(50, 8, "Değer", border=1, fill=True, align='C')
-        pdf.cell(0, 8, "Birim", border=1, fill=True, ln=True, align='C')
+        pdf.cell(0, 8, "Birim", border=1, fill=True, new_x="LMARGIN", new_y="NEXT", align='C')
         
         pdf.set_font(font_family, "", 9)
         for prop, value, unit in results:
@@ -361,12 +361,12 @@ class ReportGenerator:
                 # Section header
                 pdf.set_font(font_family, "I", 9)
                 pdf.set_fill_color(245, 245, 245)
-                pdf.cell(0, 7, prop.strip('- '), ln=True, fill=True, border=1)
+                pdf.cell(0, 7, prop.strip('- '), new_x="LMARGIN", new_y="NEXT", fill=True, border=1)
                 pdf.set_font(font_family, "", 9)
             else:
                 pdf.cell(100, 7, f" {prop}", border=1)
                 pdf.cell(50, 7, value, border=1, align='C')
-                pdf.cell(0, 7, unit, border=1, ln=True, align='C')
+                pdf.cell(0, 7, unit, border=1, new_x="LMARGIN", new_y="NEXT", align='C')
         
         # Footer
         pdf.set_y(-20)

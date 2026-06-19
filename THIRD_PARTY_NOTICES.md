@@ -40,3 +40,25 @@ Reference paper:
 Kamyab, M.; Sampaio Jr., J. H. B.; Qanbari, F.; Eustes III, A. W.
 "Using artificial neural networks to estimate the Z-Factor for natural hydrocarbon gases",
 Journal of Petroleum Science and Engineering, 2010, 73, 248-257.
+
+---
+
+## fpdf2
+
+PDF generation library used via `natural_gas_main/utils/report_generator.py`.
+
+https://github.com/PyFPDF/fpdf2
+
+Copyright (c) 2021-2025 Olivier PLATHEY and contributors
+
+Licensed under the GNU Lesser General Public License v3 or later (LGPLv3+).
+
+**LGPL Source Code Notice:**
+This application statically links fpdf2 (LGPL-licensed). You are entitled to
+receive the source code and any modifications of fpdf2 used in this application.
+Source code for this application is available at:
+https://github.com/anomalyco/Natural-Gas-Prop-Main
+
+To obtain the complete corresponding source code for the LGPL-licensed components,
+please contact the application author or visit the fpdf2 repository at:
+https://github.com/PyFPDF/fpdf2

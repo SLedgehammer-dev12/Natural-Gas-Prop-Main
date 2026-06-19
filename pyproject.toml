@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "natural-gas-prop-main"
-version = "1.6.1"
+version = "1.7.0"
 description = "Termodinamik doğal gaz karışımı hesaplama uygulaması"
 readme = "README.md"
 license = { text = "Proprietary - Kompresör Pompa" }
@@ -42,7 +42,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=50 --strict-markers -ra"
+addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=70 --strict-markers -ra"
 markers = [
     "slow: Yavaş testler (CoolProp bağımlı)",
     "integration: Entegrasyon testleri",

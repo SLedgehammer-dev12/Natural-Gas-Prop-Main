@@ -18,6 +18,7 @@ def test_physical_constants_not_rewritten():
     assert config.P_NORMAL == 101325.0
     assert config.STANDARD_CONDITIONS["ISO 13443 (15°C, 1 atm)"]["P"] == 101325.0
     assert config.M3_TO_SCF == 35.3147
+    assert config.P_ATM_PSI == 14.6959
 
 
 def test_version_json_matches_code():

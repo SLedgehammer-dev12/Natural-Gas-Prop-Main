@@ -8,6 +8,7 @@ import json
 import logging
 import urllib.request
 import urllib.parse
+import urllib.error
 import webbrowser
 from typing import Tuple, Optional, Dict, Any
 from packaging import version
