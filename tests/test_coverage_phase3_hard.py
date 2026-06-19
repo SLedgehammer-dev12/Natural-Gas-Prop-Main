@@ -27,9 +27,11 @@ from natural_gas_main.core.exceptions import BackendNotAvailableError
 
 class TestLoggerResolveLogPath:
     def test_absolute_path(self):
+        from pathlib import Path, PurePosixPath
         from natural_gas_main.utils.logger import _resolve_log_path
-        result = _resolve_log_path("/tmp/myapp.log")
-        assert str(result) == "/tmp/myapp.log"
+        result = _resolve_log_path(str(PurePosixPath("/tmp/myapp.log")))
+        expected = Path("/tmp/myapp.log")
+        assert result == expected
 
     def test_relative_path_uses_state_dir(self):
         from natural_gas_main.utils.logger import _resolve_log_path
