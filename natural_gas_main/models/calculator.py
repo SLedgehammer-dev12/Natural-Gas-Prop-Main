@@ -1466,12 +1466,15 @@ class ThermoCalculator:
         volume_norm = None
         error_msg = None
         try:
-            # Create state at Normal conditions
+            # NeqSim backends not supported by CoolProp _create_state
+            norm_backend = backend
+            if self._is_neqsim_backend(backend):
+                norm_backend = "HEOS"
             state_norm = self._create_state(
                 mixture, 
                 config.T_NORMAL, 
                 config.P_NORMAL, 
-                backend
+                norm_backend
             )
             rho_norm = state_norm.rhomass()
             volume_norm = mass / rho_norm
