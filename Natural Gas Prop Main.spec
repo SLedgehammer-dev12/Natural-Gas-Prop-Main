@@ -4,17 +4,22 @@ import pathlib
 import sys
 import re
 import customtkinter
-import neqsim
+try:
+    import neqsim
+except Exception:
+    neqsim = None
 
 from PyInstaller.building.datastruct import Tree
 
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
-_neqsim_path = pathlib.Path(neqsim.__file__).parent
 
 # Collect NeqSim JAR files using Tree (recursive scan)
 # includes neqsim-3.14.0.jar (Java 11+) and neqsim-3.14.0-Java8.jar
-_tree_toc = Tree(str(_neqsim_path / "lib"), prefix="neqsim/lib")
-_neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
+_neqsim_datas = []
+if neqsim is not None:
+    _neqsim_path = pathlib.Path(neqsim.__file__).parent
+    _tree_toc = Tree(str(_neqsim_path / "lib"), prefix="neqsim/lib")
+    _neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
