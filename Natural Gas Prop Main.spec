@@ -36,13 +36,14 @@ a = Analysis(
         'customtkinter',
         'packaging',
         'pydantic',
+        'neqsim',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['neqsim', 'jpype', 'jpype1', 'pandas'],
+    excludes=[],
     noarchive=False,
-    optimize=0,
+    optimize=1,
 )
 pyz = PYZ(a.pure)
 
