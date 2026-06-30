@@ -340,8 +340,9 @@ class TestHeatingValues:
         ):
             with patch("natural_gas_main.models.calculator.is_iso6976_compatible", return_value=False):
                 with patch.object(calc, '_calculate_heating_values_reference', side_effect=Exception("fail")):
-                    result = calc._calculate_heating_values(simple_mixture, 0.66, 0.6, "HEOS", 288.15, 101325)
-                    assert result is None
+                    with patch("natural_gas_main.models.calculator.NEQSIM_AVAILABLE", False):
+                        result = calc._calculate_heating_values(simple_mixture, 0.66, 0.6, "HEOS", 288.15, 101325)
+                        assert result is None
 
     def test_reference_db_t_ref_warning(self, calc, simple_mixture):
         hv = calc._calculate_heating_values(simple_mixture, 0.66, 0.6, "SRK", 273.15, 101325)
