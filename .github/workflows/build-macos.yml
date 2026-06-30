@@ -25,11 +25,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install CoolProp>=7.2.0,<8.0.0 numpy>=1.26.0,<2.0.0 packaging>=21.0
-          pip install pydantic>=2.0.0 customtkinter>=5.2.2 matplotlib>=3.10.0
-          pip install fpdf2>=2.8.0 pyaga8>=0.1.16
-          pip install neqsim>=3.6.1 || true
+          pip install -r requirements.txt
           pip install pyinstaller pytest pytest-cov
+
+      - name: Remove NeqSim (no Java on macOS runner)
+        run: pip uninstall -y neqsim jpype1 pandas pytz tzdata 2>/dev/null || true
 
       - name: Run tests (skip NeqSim - no Java JVM)
         run: pytest --ignore=tests/test_neqsim_calculator.py --ignore=tests/test_neqsim_calculator_edge.py -q
