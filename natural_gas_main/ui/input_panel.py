@@ -559,6 +559,9 @@ class InputPanel(ctk.CTkFrame):
             info_text = f"Referans: {t_c:.2f}°C, {p_kpa:.3f} kPa ({p_psi:.3f} psi)"
             self.std_info_label.configure(text=info_text)
 
+            if not hasattr(self, "temp_unit_var"):
+                return
+
             temp_unit = self.temp_unit_var.get()
             if temp_unit == "°C":
                 self.temp_var.set(f"{t_c:.2f}")
