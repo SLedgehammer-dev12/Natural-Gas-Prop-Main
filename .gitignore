@@ -57,6 +57,10 @@ archive/
 coverage.xml
 .coverage.*
 
+# Legacy local folders (not in remote)
+Doğal Gaz Özellikleri/
+Natural Gas Prop Main/
+
 # Log rotation backups
 *.log.*
 dist_debug/
