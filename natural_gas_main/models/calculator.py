@@ -396,6 +396,18 @@ class ThermoCalculator:
         # 2.5 Add NeqSim backends for comparison
         for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
             if self._is_neqsim_backend(main_backend or "") and method == main_backend:
+                if main_actual is not None:
+                    comparisons.append(ZFactorComparison(
+                        method=method,
+                        z_factor=main_actual.compressibility_factor,
+                        density=main_actual.density,
+                        molar_mass=main_actual.molar_mass,
+                        enthalpy=main_actual.enthalpy,
+                        entropy=main_actual.entropy,
+                        cp=main_actual.cp,
+                        cv=main_actual.cv,
+                        ppr=ppr, tpr=tpr, valid=True, warning=None
+                    ))
                 continue
             try:
                 res, _ = calculate_neqsim(mixture, temperature_k, pressure_pa, method)

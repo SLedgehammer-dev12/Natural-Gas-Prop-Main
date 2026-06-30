@@ -505,6 +505,13 @@ def get_neqsim_hydrate_temperature(
     if not NEQSIM_AVAILABLE:
         return None
 
+    has_water = any(
+        c.name.strip().lower() in ("water", "h2o", "su")
+        for c in mixture.components
+    )
+    if not has_water:
+        return None
+
     logger = logging.getLogger(__name__)
     try:
         fluid = _jneqsim.thermo.system.SystemSrkCPAstatoil(temperature_k, pressure_pa / 1e5)
