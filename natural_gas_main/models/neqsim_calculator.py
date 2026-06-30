@@ -24,6 +24,19 @@ try:
     from neqsim import jneqsim as _jneqsim
     NEQSIM_AVAILABLE = True
     logging.getLogger(__name__).info("NeqSim başarıyla yüklendi")
+
+    import sys as _sys
+    if getattr(_sys, 'frozen', False):
+        import os as _os
+        _mei = _sys._MEIPASS
+        for _root, _dirs, _files in _os.walk(_mei):
+            for _f in _files:
+                if _f.endswith('.jar'):
+                    try:
+                        import jpype as _jp
+                        _jp.addClassPath(_os.path.join(_root, _f))
+                    except Exception:
+                        pass
 except ImportError as e:
     logging.getLogger(__name__).error(f"NeqSim içe aktarılamadı: {e}")
 except Exception as e:

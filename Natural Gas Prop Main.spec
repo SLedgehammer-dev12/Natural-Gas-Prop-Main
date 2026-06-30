@@ -4,8 +4,17 @@ import pathlib
 import sys
 import re
 import customtkinter
+import neqsim
+
+from PyInstaller.building.datastruct import Tree
 
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
+_neqsim_path = pathlib.Path(neqsim.__file__).parent
+
+# Collect NeqSim JAR files using Tree (recursive scan)
+# includes neqsim-3.14.0.jar (Java 11+) and neqsim-3.14.0-Java8.jar
+_tree_toc = Tree(str(_neqsim_path / "lib"), prefix="neqsim/lib")
+_neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
@@ -26,7 +35,7 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/')],
+    datas=[(str(customtkinter_path), 'customtkinter/')] + list(_neqsim_datas),
     hiddenimports=[
         'CoolProp.CoolProp',
         'matplotlib.backends.backend_tkagg',
@@ -40,7 +49,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['patches/pyi_rth_neqsim.py'],
     excludes=[],
     noarchive=False,
     optimize=1,
