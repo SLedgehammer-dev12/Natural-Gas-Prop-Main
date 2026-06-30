@@ -11,8 +11,10 @@ import sys
 import os
 from pathlib import Path
 
+import tempfile as _tempfile
+
 # Write immediate startup marker for debugging
-_STARTUP_LOG = os.path.join(os.environ.get("TMPDIR", "/tmp"), "ngp_startup.log")
+_STARTUP_LOG = os.path.join(_tempfile.gettempdir(), "ngp_startup.log")
 try:
     with open(_STARTUP_LOG, "w") as f:
         f.write(f"BOOT: Natural Gas Prop Main\n")

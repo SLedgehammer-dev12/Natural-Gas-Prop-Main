@@ -1,0 +1,55 @@
+name: Build macOS
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests (skip NeqSim - no Java JVM)
+        run: pytest --ignore=tests/test_neqsim_calculator.py --ignore=tests/test_neqsim_calculator_edge.py -q
+
+      - name: Build .app bundle
+        run: pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
+
+      - name: Create .dmg
+        run: |
+          APP_DIR=$(ls -d dist/"Natural Gas Prop Main"*/ 2>/dev/null | head -1)
+          if [ -d "$APP_DIR" ]; then
+            VERSION=$(python -c "import json; print(json.load(open('version.json'))['version'].lstrip('v'))")
+            hdiutil create -volname "Natural Gas Prop" \
+              -srcfolder "$APP_DIR" \
+              -ov -format UDZO \
+              "dist/Natural-Gas-Prop-v${VERSION}.dmg"
+          else
+            echo "::error::.app bundle not found"
+            exit 1
+          fi
+
+      - name: Upload .dmg to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Natural-Gas-Prop-*.dmg
