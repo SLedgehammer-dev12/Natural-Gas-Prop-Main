@@ -100,7 +100,7 @@ NEQSIM_GAS_MAPPING: Dict[str, str] = {
 NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     "neqsim-srk": {
         "class": "SystemSrkEos",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "SRK Ailesi",
         "desc": "Soave-Redlich-Kwong (standart)",
         "multiphase": False,
@@ -108,7 +108,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-srk-peneloux": {
         "class": "SystemSrkPenelouxEos",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "SRK Ailesi",
         "desc": "SRK + Peneloux hacim düzeltmesi (iyi sıvı yoğunluğu)",
         "multiphase": False,
@@ -116,7 +116,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-srk-mc": {
         "class": "SystemSrkMathiasCopeman",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "SRK Ailesi",
         "desc": "SRK + Mathias-Copeman alpha (polar bileşenler)",
         "multiphase": False,
@@ -124,7 +124,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-srk-twucoon": {
         "class": "SystemSrkTwuCoon",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "SRK Ailesi",
         "desc": "SRK + Twu-Coon alpha (süperkritik)",
         "multiphase": False,
@@ -132,7 +132,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-pr": {
         "class": "SystemPrEos",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "PR Ailesi",
         "desc": "Peng-Robinson (standart)",
         "multiphase": False,
@@ -140,7 +140,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-pr-mc": {
         "class": "SystemPrMathiasCopeman",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "PR Ailesi",
         "desc": "PR + Mathias-Copeman alpha",
         "multiphase": False,
@@ -148,7 +148,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-pr-twucoon": {
         "class": "SystemPrTwuCoon",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "PR Ailesi",
         "desc": "PR + Twu-Coon alpha (süperkritik)",
         "multiphase": False,
@@ -156,7 +156,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-pr-danesh": {
         "class": "SystemPrDanesh",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "PR Ailesi",
         "desc": "PR + Danesh düzeltmesi (rezervuar)",
         "multiphase": False,
@@ -213,7 +213,7 @@ NEQSIM_EOS_REGISTRY: Dict[str, Dict] = {
     },
     "neqsim-umrpru": {
         "class": "SystemUMRPRUMCEos",
-        "mixing": "classic",
+        "mixing": "no",
         "group": "Tahminsel",
         "desc": "UMR-PRU - tahminsel, etkileşim parametresi gerekmez",
         "multiphase": False,
@@ -296,7 +296,7 @@ def calculate_neqsim(
                         f"Referans EOS '{method}' '{neqsim_name}' desteklemiyor."
                     )
 
-        if mixing_rule is not None:
+        if mixing_rule is not None and mixing_rule != "no":
             try:
                 fluid.setMixingRule(mixing_rule)
             except Exception as exc:
@@ -452,7 +452,7 @@ def get_neqsim_iso6976(mixture, temperature_ref_k: float = 288.15) -> Optional[D
     try:
         from neqsim.thermo import fluid as nqfluid, TPflash as nqTPflash
 
-        nqf = nqfluid("gerg2008")
+        nqf = nqfluid("gerg-2008")
         nqf.setTemperature(temperature_ref_k - 273.15, "C")
         nqf.setPressure(1.01325, "bara")
 
@@ -461,7 +461,6 @@ def get_neqsim_iso6976(mixture, temperature_ref_k: float = 288.15) -> Optional[D
             neqsim_name = _get_neqsim_gas_name(coolprop_name)
             nqf.addComponent(neqsim_name, comp.fraction, "mol/sec")
 
-        nqf.setMixingRule("classic")
         nqTPflash(nqf)
 
         gas_system = nqf.getSystem()
