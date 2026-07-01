@@ -14,9 +14,8 @@ if _neqsim_spec is not None and _neqsim_spec.submodule_search_locations:
     for _loc in _neqsim_spec.submodule_search_locations:
         _jar_dir = pathlib.Path(_loc) / "lib"
         if _jar_dir.is_dir():
-            from PyInstaller.building.datastruct import Tree
-            _tree_toc = Tree(str(_jar_dir), prefix="neqsim/lib")
-            _neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
+            for _jar_file in sorted(_jar_dir.glob("*.jar")):
+                _neqsim_datas.append((str(_jar_file), "neqsim/lib"))
             break
 
 # Read version from version_info.txt for output naming
