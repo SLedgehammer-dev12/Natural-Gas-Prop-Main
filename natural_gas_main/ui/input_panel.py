@@ -329,7 +329,7 @@ class InputPanel(ctk.CTkFrame):
         ctk.CTkLabel(volume_frame, text="Yöntem:").grid(row=2, column=0, padx=10, pady=(0, 10), sticky="w")
         
         self.method = ctk.StringVar(value=config.DEFAULT_BACKEND)
-        methods = config.AVAILABLE_BACKENDS
+        methods = config.get_available_backends()
         self.method_combo = ctk.CTkComboBox(
             volume_frame,
             variable=self.method,

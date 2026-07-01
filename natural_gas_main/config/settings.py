@@ -231,11 +231,25 @@ class AppConfig(BaseModel):
     def UPDATE_CHECK_URL(self) -> str:
         """Get URL to check for updates (raw JSON)."""
         return f"https://raw.githubusercontent.com/{self.REPO_USER}/{self.REPO_NAME}/{self.BRANCH_NAME}/version.json"
-    
+
     @property
     def REPO_URL(self) -> str:
         """Get main repository URL."""
         return f"https://github.com/{self.REPO_USER}/{self.REPO_NAME}/tree/{self.BRANCH_NAME}"
+
+    def get_available_backends(self) -> List[str]:
+        """Return available backends filtered by NeqSim availability.
+
+        When Java/NeqSim is not available, NeqSim backends are hidden
+        from the UI to keep the interface clean.
+        """
+        try:
+            from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE
+        except ImportError:
+            NEQSIM_AVAILABLE = False
+        if NEQSIM_AVAILABLE:
+            return list(self.AVAILABLE_BACKENDS)
+        return [b for b in self.AVAILABLE_BACKENDS if not b.startswith("neqsim-")]
 
     model_config = ConfigDict(validate_assignment=True, frozen=False)
 

@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
+import shutil
+import sys as _sys
 from typing import Dict, Optional, Tuple
 
 from natural_gas_main.models.calculation_result import ActualConditionResults, TransportProperties
@@ -20,27 +23,74 @@ from natural_gas_main.core.exceptions import BackendNotAvailableError
 NEQSIM_AVAILABLE = False
 _jneqsim = None
 
+
+def _detect_java_home() -> Optional[str]:
+    """Detect Java home directory without glob/wildcard (AV-safe).
+
+    Priority:
+    1. JAVA_HOME environment variable
+    2. java on PATH via shutil.which()
+    3. Known fixed installation directories (explicit paths, no glob)
+
+    Returns:
+        Path to Java home directory, or None if not found.
+    """
+    java_exe = "java.exe" if _sys.platform == "win32" else "java"
+
+    java_home = os.environ.get("JAVA_HOME", "")
+    if java_home and os.path.isfile(os.path.join(java_home, "bin", java_exe)):
+        return java_home
+
+    java_bin = shutil.which("java")
+    if java_bin:
+        java_real = os.path.realpath(java_bin)
+        return os.path.dirname(os.path.dirname(java_real))
+
+    if _sys.platform == "win32":
+        # Fixed known paths – no glob, no wildcard
+        known = [
+            _sys.prefix,
+            os.path.expandvars(r"%ProgramFiles%\Eclipse Adoptium\jdk-21.0.7+7-hotspot"),
+            os.path.expandvars(r"%ProgramFiles%\Java\jdk-21"),
+        ]
+    else:
+        known = [
+            "/usr/lib/jvm/java-21-openjdk",
+            "/usr/lib/jvm/java-17-openjdk",
+            "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+            "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home",
+        ]
+
+    for path in known:
+        if path and os.path.isfile(os.path.join(path, "bin", java_exe)):
+            return path
+
+    return None
+
+
+# Attempt to import NeqSim and start JVM
 try:
+    java_home = _detect_java_home()
+    if java_home:
+        os.environ.setdefault("JAVA_HOME", java_home)
+        os.environ.setdefault("PATH", os.environ.get("PATH", "") + os.pathsep + os.path.join(java_home, "bin"))
+
     from neqsim import jneqsim as _jneqsim
+
+    if getattr(_sys, 'frozen', False):
+        _jar_dir = os.path.join(_sys._MEIPASS, "neqsim", "lib")
+        if os.path.isdir(_jar_dir):
+            import jpype as _jp
+            for _f in sorted(os.listdir(_jar_dir)):
+                if _f.endswith('.jar'):
+                    _jp.addClassPath(os.path.join(_jar_dir, _f))
+
     NEQSIM_AVAILABLE = True
     logging.getLogger(__name__).info("NeqSim başarıyla yüklendi")
-
-    import sys as _sys
-    if getattr(_sys, 'frozen', False):
-        import os as _os
-        _mei = _sys._MEIPASS
-        for _root, _dirs, _files in _os.walk(_mei):
-            for _f in _files:
-                if _f.endswith('.jar'):
-                    try:
-                        import jpype as _jp
-                        _jp.addClassPath(_os.path.join(_root, _f))
-                    except Exception:
-                        pass
 except ImportError as e:
-    logging.getLogger(__name__).error(f"NeqSim içe aktarılamadı: {e}")
+    logging.getLogger(__name__).warning(f"NeqSim içe aktarılamadı (Java yoksa normal): {e}")
 except Exception as e:
-    logging.getLogger(__name__).error(f"NeqSim JVM başlatılamadı: {e}")
+    logging.getLogger(__name__).warning(f"NeqSim JVM başlatılamadı: {e}")
 
 NEQSIM_GAS_MAPPING: Dict[str, str] = {
     "methane": "methane",

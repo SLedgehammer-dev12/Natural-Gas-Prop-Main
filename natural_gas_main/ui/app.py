@@ -68,6 +68,12 @@ class ThermoApp(ctk.CTk):
         self._calc_lock = threading.Lock()
         self._is_calculating = False
 
+        from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE as _neqsim_avail
+        if _neqsim_avail:
+            self.logger.info("NeqSim hazır: 15 EOS modeli kullanılabilir")
+        else:
+            self.logger.info("NeqSim kullanılamıyor [Java bulunamadı]. CoolProp/AGA8 backend'leri aktif.")
+
         self.result_queue = queue.Queue()
 
         
@@ -178,6 +184,15 @@ class ThermoApp(ctk.CTk):
         help_menu.add_command(label="Güncellemeleri Denetle", command=self._check_for_updates_manual)
         help_menu.add_separator()
         help_menu.add_command(label="Hakkında", command=self._show_about)
+
+        # NeqSim Java info (only when NeqSim is not available)
+        from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE
+        if not NEQSIM_AVAILABLE:
+            help_menu.add_separator()
+            help_menu.add_command(
+                label="NeqSim Kurulum Bilgisi",
+                command=lambda: dialogs.show_neqsim_java_info(parent=self)
+            )
         
         # View menu (Appearance)
         view_menu = tk.Menu(menubar, tearoff=0)

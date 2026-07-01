@@ -31,10 +31,7 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller pytest pytest-cov
 
-      - name: Remove NeqSim (no Java on macOS runner)
-        run: pip uninstall -y neqsim jpype1 pandas pytz tzdata 2>/dev/null || true
-
-      - name: Run tests (skip NeqSim - no Java JVM)
+      - name: Run tests (skip NeqSim - no Java JVM on CI)
         run: pytest --ignore=tests/test_neqsim_calculator.py --ignore=tests/test_neqsim_calculator_edge.py -q
 
       - name: Build .app bundle

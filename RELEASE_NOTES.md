@@ -1,3 +1,40 @@
+# Natural Gas Prop Main v1.7.1
+
+**Tarih:** Temmuz 2026
+
+## Önemli Değişiklikler
+
+### Windows Onedir Dağıtım (Antivirüs Fix)
+Windows için **onefile .exe** yerine **onedir klasör** dağıtımına geçildi. PyInstaller'ın runtime temp extraction davranışı kaldırıldı — bu, Trend Micro ve benzeri AV'lerin false positive engellemesini çözer. Kullanıcı ZIP'i indirip klasöre çıkarır, içindeki `.exe`'ye tıklar.
+
+### macOS Pydantic Düzeltmesi
+`optimize=2` Python bytecode optimizasyonu Pydantic v2'nin docstring bağımlılığını kırdığı için macOS `.app` çöküyordu. `optimize=1` ile düzeltildi.
+
+### NeqSim 15 EOS — Temiz Arayüz
+- Java 17/21 kuruluysa NeqSim otomatik algılanır, 15 EOS modeli aktif olur
+- Java yoksa sadece CoolProp/AGA8 backend'leri gösterilir (temiz UI)
+- Menüden "NeqSim Kurulum Bilgisi" ile Java kurulum talimatları alınabilir
+- JAR dosyaları onedir klasöründe normal dosya olarak bulunur — AV tetiklemez
+
+### AV-dostu Java Algılama
+Runtime hook kaldırıldı. Java algılama artık `glob`/wildcard kullanmıyor — sadece `JAVA_HOME` env, `PATH` ve sabit bilinen dizinler.
+
+## Build & Dağıtım
+
+| Platform | Format | Boyut |
+|----------|--------|-------|
+| Windows | `.zip` (onedir klasör) | ~55 MB |
+| macOS | `.dmg` (`.app` bundle) | ~55 MB |
+
+## Test Altyapısı
+
+| Metrik | v1.7.1 |
+|--------|--------|
+| Test sayısı | **610** |
+| Coverage | **%91** |
+
+---
+
 # Natural Gas Prop Main v1.6.1
 
 **Tarih:** Haziran 2026

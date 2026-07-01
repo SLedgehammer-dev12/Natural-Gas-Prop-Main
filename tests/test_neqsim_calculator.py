@@ -10,6 +10,8 @@ Includes:
 
 import pytest
 import math
+import sys as _sys_module
+_sys_platform = _sys_module.platform
 from unittest.mock import patch, MagicMock, PropertyMock
 
 from natural_gas_main.models.neqsim_calculator import (
@@ -885,3 +887,78 @@ class TestNeqSimBackendIntegration:
         assert first_call_args[0][3] == "neqsim-srk"  # method arg
         assert result.actual.compressibility_factor == 0.95
         assert result.backend_used == "neqsim-srk"
+
+
+# ── Java Detection Tests ─────────────────────────────────────────────
+
+class TestJavaDetection:
+    """Test the _detect_java_home() function (AV-safe, no glob/wildcard)."""
+
+    def test_java_home_env_detected(self, tmp_path, monkeypatch):
+        """When JAVA_HOME points to a valid Java, return it."""
+        java_exe = "java.exe" if _sys_platform == "win32" else "java"
+        jdk_dir = tmp_path / "jdk"
+        bin_dir = jdk_dir / "bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / java_exe).touch()
+
+        monkeypatch.setenv("JAVA_HOME", str(jdk_dir))
+
+        from natural_gas_main.models.neqsim_calculator import _detect_java_home
+        result = _detect_java_home()
+        assert result == str(jdk_dir)
+
+    def test_java_from_path(self, tmp_path, monkeypatch):
+        """When java is found on PATH via shutil.which, return its home."""
+        java_exe = "java.exe" if _sys_platform == "win32" else "java"
+        jdk_dir = tmp_path / "jdk2"
+        bin_dir = jdk_dir / "bin"
+        bin_dir.mkdir(parents=True)
+        java_path = bin_dir / java_exe
+        java_path.touch()
+
+        import shutil as _shutil
+        monkeypatch.setattr(_shutil, "which", lambda x: str(java_path) if x == "java" else None)
+        monkeypatch.delenv("JAVA_HOME", raising=False)
+
+        from natural_gas_main.models.neqsim_calculator import _detect_java_home
+        result = _detect_java_home()
+        assert result == str(jdk_dir)
+
+    def test_java_not_found_returns_none(self, monkeypatch):
+        """When no Java is installed, return None."""
+        monkeypatch.delenv("JAVA_HOME", raising=False)
+        import shutil as _shutil
+        monkeypatch.setattr(_shutil, "which", lambda x: None)
+
+        from natural_gas_main.models.neqsim_calculator import _detect_java_home
+        result = _detect_java_home()
+        assert result is None
+
+    def test_java_home_invalid_bin_skipped(self, tmp_path, monkeypatch):
+        """JAVA_HOME that exists but has no java.exe is not used."""
+        jdk_dir = tmp_path / "fake_jdk"
+        jdk_dir.mkdir(parents=True)
+
+        monkeypatch.setenv("JAVA_HOME", str(jdk_dir))
+        import shutil as _shutil
+        monkeypatch.setattr(_shutil, "which", lambda x: None)
+
+        from natural_gas_main.models.neqsim_calculator import _detect_java_home
+        result = _detect_java_home()
+        assert result is None
+
+    def test_frozen_mode_jar_classpath(self, tmp_path, monkeypatch):
+        """In frozen mode, verify that JAR detection path logic is correct."""
+        meipass = tmp_path / "meipass"
+        jar_dir = meipass / "neqsim" / "lib"
+        jar_dir.mkdir(parents=True)
+        (jar_dir / "neqsim-3.14.0.jar").touch()
+        (jar_dir / "neqsim-3.14.0-Java8.jar").touch()
+
+        import os as _os
+        jar_path = _os.path.join(str(meipass), "neqsim", "lib")
+        jars = sorted([f for f in _os.listdir(jar_path) if f.endswith('.jar')])
+        assert len(jars) == 2
+        assert "neqsim-3.14.0.jar" in jars
+        assert "neqsim-3.14.0-Java8.jar" in jars

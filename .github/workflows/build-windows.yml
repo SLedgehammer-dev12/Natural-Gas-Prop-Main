@@ -50,10 +50,6 @@ jobs:
           pip install -e .
           pip install pyinstaller
 
-      - name: Remove NeqSim (no Java on CI)
-        run: |
-          pip uninstall -y neqsim jpype1 pandas pytz tzdata 2>$null
-
       - name: Run tests
         run: |
           pip install pytest pytest-timeout

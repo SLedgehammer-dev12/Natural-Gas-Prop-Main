@@ -115,8 +115,9 @@ def show_about_dialog() -> None:
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
         "Sürüm v1.7.1 - Profesyonel Sürüm\n\n"
-        "v1.7.1 sürümü: Onedir dağıtım (Windows + macOS),\n"
-        "AV uyumluluğu iyileştirmeleri, optimize=1.\n\n"
+        "v1.7.1 sürümü: Windows onedir dağıtım (AV fix),\n"
+        "NeqSim 15 EOS (Java 21+), optimize=1 macOS düzeltmesi.\n\n"
+        f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
@@ -130,10 +131,12 @@ def show_user_guide_dialog() -> None:
     neqsim_note = ""
     if not NEQSIM_AVAILABLE:
         neqsim_note = (
-            "\n⚠ NEQSIM UYARISI:\n"
-            "   NeqSim kullanılamıyor (Java 11+ gerekli).\n"
-            "   Java kurulumu: https://adoptium.net/\n"
-            "   pip install neqsim>=3.6.1\n"
+            "\n⚠ NEQSIM DURUMU:\n"
+            "   NeqSim motoru kullanılamıyor (Java 17/21 gerekli).\n"
+            "   Java kurulumu için: https://adoptium.net/\n"
+            "   JDK 21 kurun, programı yeniden başlatın.\n"
+            "   Java kurulmazsa uygulama CoolProp/AGA8 ile\n"
+            "   sorunsuz çalışmaya devam eder.\n"
         )
     
     guide_text = (
@@ -185,6 +188,26 @@ def show_neqsim_unavailable_warning(selected_backend: str) -> None:
     )
 
 
+def show_neqsim_java_info(parent=None) -> None:
+    """Show NeqSim Java installation guide popup."""
+    messagebox.showinfo(
+        "NeqSim - Java Gereklidir",
+        "NeqSim termodinamik motoru (15 EOS modeli) için\n"
+        "Java 17 veya 21 gereklidir.\n\n"
+        "Java Kurulumu:\n"
+        "  1. https://adoptium.net adresine gidin\n"
+        "  2. 'Eclipse Temurin JDK 21' indirin\n"
+        "  3. Kurulumu tamamlayın\n"
+        "  4. Natural Gas Prop uygulamasını yeniden başlatın\n\n"
+        "Java kurulduğunda NeqSim otomatik algılanır ve\n"
+        "15 EOS modeli (GERG-2008, SRK, PR, CPA vb.)\n"
+        "kullanıma açılır.\n\n"
+        "Java yüklemek istemezseniz, CoolProp/AGA8\n"
+        "backend'leri ile çalışmaya devam edebilirsiniz.",
+        parent=parent
+    )
+
+
 def show_new_features_info() -> None:
     """Show new features information for current version with do not show again option."""
     from natural_gas_main.config.settings import config
@@ -206,7 +229,25 @@ def show_new_features_info() -> None:
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.7.0":
+    if version == "v1.7.1":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
+            "• Yeni Dağıtım Modeli (Windows): Tek .exe yerine\n"
+            "  onedir klasör dağıtımı — antivirüs false positive\n"
+            "  sorunu çözüldü, artık engellenmiyor.\n\n"
+            "• macOS Düzeltmesi: Pydantic uyumluluk sorunu\n"
+            "  (optimize=2 docstring hatası) giderildi.\n\n"
+            "• NeqSim 15 EOS Motoru: Java 21+ kuruluysa\n"
+            "  otomatik algılanır ve tüm backend'ler aktif olur.\n"
+            "  Java yoksa sadece CoolProp/AGA8 gösterilir\n"
+            "  (temiz arayüz).\n\n"
+            "• AV Uyumluluğu: Runtime hook ve gömülü JAR\n"
+            "  temizliği yapıldı, dosya sistemi taraması kaldırıldı.\n"
+            "  Java algılama AV-dostu (glob/wildcard yok).\n\n"
+            "• 606 test, %91 coverage.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.7.0":
         info_text = (
             "📋 BU SÜRÜMDEKİ DÜZELTMELER:\n\n"
             "• Exception Güvenliği: Tüm 'except BaseException' ve 'except: pass'\n"

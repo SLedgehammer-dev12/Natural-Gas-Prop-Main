@@ -4,8 +4,20 @@ import pathlib
 import sys
 import re
 import customtkinter
+import importlib.util as _importlib_util
 
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
+
+_neqsim_datas = []
+_neqsim_spec = _importlib_util.find_spec("neqsim")
+if _neqsim_spec is not None and _neqsim_spec.submodule_search_locations:
+    for _loc in _neqsim_spec.submodule_search_locations:
+        _jar_dir = pathlib.Path(_loc) / "lib"
+        if _jar_dir.is_dir():
+            from PyInstaller.building.datastruct import Tree
+            _tree_toc = Tree(str(_jar_dir), prefix="neqsim/lib")
+            _neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
+            break
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
@@ -26,7 +38,7 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/')],
+    datas=[(str(customtkinter_path), 'customtkinter/')] + list(_neqsim_datas),
     hiddenimports=[
         'CoolProp.CoolProp',
         'matplotlib.backends.backend_tkagg',
