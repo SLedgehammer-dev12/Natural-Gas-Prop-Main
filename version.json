@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.7.1",
-  "date": "2026-06-30",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.1",
-  "changelog": "- Exception guvenligi: BaseException ve bare except temizligi.\n- Thread guvenligi: Update checker arka planda, logger thread-safe.\n- CI kalitesi: Test adimi ve pip onbellekleme eklendi.\n- Termodinamik: isohexane mapping duzeltildi, ISO 6976 GERG-2008.\n- Cok loblu faz zarfinda cricondenbar/cricondentherm dogru tespit.\n- Hidrat yakinlama kontrolu, Sutton clamp uyarisi.\n- AGA8 eser bilesen toleransi, hava yogunlugu helper.\n- Tema degisince pasta grafigi ve TreeView otomatik guncelleniyor.\n- Coverage threshold %70'e yukseltildi.\n- 564 test, %85 coverage (threshold %70)."
+  "version": "v1.7.2",
+  "date": "2026-07-01",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.2",
+  "changelog": "- AV uyumlulugu: runtime hook (Java filesystem taramasi) kaldirildi.\n- AV uyumlulugu: NeqSim JAR .exe icine gomulmesi kaldirildi.\n- Build: optimize=2 geri getirildi (v1.6.0 uyumlu).\n- Test: hatali hydrate ve isohexane testleri duzeltildi.\n- 606 test, %91 coverage."
 }

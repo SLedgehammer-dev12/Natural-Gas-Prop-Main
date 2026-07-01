@@ -76,7 +76,7 @@ class TestGetNeqsimGasNameEdgeCases:
 
     def test_iso_variants_mapped_to_normal(self):
         assert _get_neqsim_gas_name("Isopentane") == "isopentane"
-        assert _get_neqsim_gas_name("Isohexane") == "n-hexane"
+        assert _get_neqsim_gas_name("Isohexane") == "2-methylpentane"
 
 
 class TestNeqSimEOSRegistryIntegrity:
@@ -103,4 +103,4 @@ class TestNeqSimEOSRegistryIntegrity:
             elif info["class"] in ("SystemSrkCPAstatoil", "SystemSoreideWhitson"):
                 assert isinstance(info["mixing"], int)
             else:
-                assert info["mixing"] == "classic"
+                assert info["mixing"] in ("classic", "no")

@@ -766,18 +766,26 @@ class TestNeqsimHydrateWithMocks:
             result = get_neqsim_hydrate_temperature(simple_mixture, 280.0, 50e5)
             assert result is None
 
-    def test_returns_temperature_when_available(self, simple_mixture):
+    def test_returns_temperature_when_available(self):
+        hydrate_mixture = GasMixture(
+            components=[
+                GasComponent(name="Methane", fraction=90.0),
+                GasComponent(name="Ethane", fraction=8.0),
+                GasComponent(name="Water", fraction=2.0),
+            ],
+            fraction_type="molar"
+        )
         with patch("natural_gas_main.models.neqsim_calculator.NEQSIM_AVAILABLE", True):
             with patch("natural_gas_main.models.neqsim_calculator._jneqsim") as mock_jneqsim:
                 mock_fluid = MagicMock()
-                mock_fluid.getTemperature.return_value = 285.0
+                mock_fluid.getTemperature.side_effect = [290.0, 285.0]
 
                 mock_system_cls = MagicMock(return_value=mock_fluid)
                 setattr(mock_jneqsim.thermo.system, "SystemSrkCPAstatoil", mock_system_cls)
                 mock_jneqsim.thermodynamicoperations.ThermodynamicOperations = MagicMock()
 
                 from natural_gas_main.models.neqsim_calculator import get_neqsim_hydrate_temperature
-                result = get_neqsim_hydrate_temperature(simple_mixture, 280.0, 50e5)
+                result = get_neqsim_hydrate_temperature(hydrate_mixture, 280.0, 50e5)
                 assert result == 285.0
 
 

@@ -4,22 +4,8 @@ import pathlib
 import sys
 import re
 import customtkinter
-try:
-    import neqsim
-except Exception:
-    neqsim = None
-
-from PyInstaller.building.datastruct import Tree
 
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
-
-# Collect NeqSim JAR files using Tree (recursive scan)
-# includes neqsim-3.14.0.jar (Java 11+) and neqsim-3.14.0-Java8.jar
-_neqsim_datas = []
-if neqsim is not None:
-    _neqsim_path = pathlib.Path(neqsim.__file__).parent
-    _tree_toc = Tree(str(_neqsim_path / "lib"), prefix="neqsim/lib")
-    _neqsim_datas = [(src, str(pathlib.Path(dest).parent.as_posix())) for dest, src, *_ in _tree_toc]
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
@@ -40,7 +26,7 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/')] + list(_neqsim_datas),
+    datas=[(str(customtkinter_path), 'customtkinter/')],
     hiddenimports=[
         'CoolProp.CoolProp',
         'matplotlib.backends.backend_tkagg',
@@ -54,10 +40,10 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['patches/pyi_rth_neqsim.py'],
+    runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=1,
+    optimize=2,
 )
 pyz = PYZ(a.pure)
 
@@ -98,8 +84,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.7.1',
-            'CFBundleVersion': '1.7.1.0',
+            'CFBundleShortVersionString': '1.7.2',
+            'CFBundleVersion': '1.7.2.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
