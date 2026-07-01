@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.7.2",
+  "version": "v1.7.1",
   "date": "2026-07-01",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.2",
-  "changelog": "- AV uyumlulugu: runtime hook (Java filesystem taramasi) kaldirildi.\n- AV uyumlulugu: NeqSim JAR .exe icine gomulmesi kaldirildi.\n- Build: optimize=2 geri getirildi (v1.6.0 uyumlu).\n- Test: hatali hydrate ve isohexane testleri duzeltildi.\n- 606 test, %91 coverage."
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.1",
+  "changelog": "- Windows: onedir dagitim (ZIP) - AV false positive cozumu.\n- macOS: optimize=1 ile Pydantic docstring duzeltmesi.\n- Her iki platform: runtime hook ve JAR bundle kaldirildi.\n- Test: hydrate ve isohexane testleri duzeltildi.\n- 606 test, %91 coverage."
 }

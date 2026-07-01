@@ -43,40 +43,45 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=2,
+    optimize=1,
 )
 pyz = PYZ(a.pure)
 
+# Common: onedir bootstrap EXE (Windows + macOS)
+_exe_kwargs = dict(
+    pyz=pyz,
+    scripts=a.scripts,
+    additional_args=[],
+    exclude_binaries=True,
+    name=_exe_name,
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+if sys.platform != 'darwin':
+    _exe_kwargs['version'] = 'version_info.txt'
+exe = EXE(**_exe_kwargs)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name=_exe_name,
+)
+
 if sys.platform == 'darwin':
-    # macOS: onedir + COLLECT + BUNDLE (.app bundle)
-    exe = EXE(
-        pyz,
-        a.scripts,
-        [],
-        exclude_binaries=True,
-        name=_exe_name,
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        runtime_tmpdir=None,
-        console=False,
-        disable_windowed_traceback=False,
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
-    )
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.datas,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        name=_exe_name,
-    )
     app = BUNDLE(
         coll,
         name=f'{_exe_name}.app',
@@ -84,33 +89,10 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.7.2',
-            'CFBundleVersion': '1.7.2.0',
+            'CFBundleShortVersionString': '1.7.1',
+            'CFBundleVersion': '1.7.1.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
         },
-    )
-else:
-    # Windows/Linux: onefile EXE (standalone)
-    exe = EXE(
-        pyz,
-        a.scripts,
-        a.binaries,
-        a.datas,
-        [],
-        name=_exe_name,
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        runtime_tmpdir=None,
-        console=False,
-        disable_windowed_traceback=False,
-        version='version_info.txt',
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
     )

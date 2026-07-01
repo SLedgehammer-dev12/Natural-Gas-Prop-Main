@@ -114,9 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.7.2 - Profesyonel Sürüm\n\n"
-        "v1.7.2 sürümü: AV uyumluluğu iyileştirmeleri,\n"
-        "runtime hook ve JAR bundle temizliği.\n\n"
+        "Sürüm v1.7.1 - Profesyonel Sürüm\n\n"
+        "v1.7.1 sürümü: Onedir dağıtım (Windows + macOS),\n"
+        "AV uyumluluğu iyileştirmeleri, optimize=1.\n\n"
         "© 2026 Kompresör Pompa"
     )
     messagebox.showinfo("Hakkında", about_text)
