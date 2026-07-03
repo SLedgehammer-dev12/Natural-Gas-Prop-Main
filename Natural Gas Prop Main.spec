@@ -4,19 +4,7 @@ import pathlib
 import sys
 import re
 import customtkinter
-import importlib.util as _importlib_util
-
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
-
-_neqsim_datas = []
-_neqsim_spec = _importlib_util.find_spec("neqsim")
-if _neqsim_spec is not None and _neqsim_spec.submodule_search_locations:
-    for _loc in _neqsim_spec.submodule_search_locations:
-        _jar_dir = pathlib.Path(_loc) / "lib"
-        if _jar_dir.is_dir():
-            for _jar_file in sorted(_jar_dir.glob("*.jar")):
-                _neqsim_datas.append((str(_jar_file), "neqsim/lib"))
-            break
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
@@ -37,7 +25,7 @@ a = Analysis(
     ['run_app.py'],
     pathex=[],
     binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/')] + list(_neqsim_datas),
+    datas=[(str(customtkinter_path), 'customtkinter/')],
     hiddenimports=[
         'CoolProp.CoolProp',
         'matplotlib.backends.backend_tkagg',
@@ -47,52 +35,44 @@ a = Analysis(
         'customtkinter',
         'packaging',
         'pydantic',
-        'neqsim',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['neqsim'],
     noarchive=False,
     optimize=1,
 )
 pyz = PYZ(a.pure)
 
-# Common: onedir bootstrap EXE (Windows + macOS)
-_exe_kwargs = dict(
-    pyz=pyz,
-    scripts=a.scripts,
-    additional_args=[],
-    exclude_binaries=True,
-    name=_exe_name,
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-if sys.platform != 'darwin':
-    _exe_kwargs['version'] = 'version_info.txt'
-exe = EXE(**_exe_kwargs)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name=_exe_name,
-)
-
 if sys.platform == 'darwin':
+    exe = EXE(
+        pyz,
+        a.scripts,
+        exclude_binaries=True,
+        name=_exe_name,
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name=_exe_name,
+    )
     app = BUNDLE(
         coll,
         name=f'{_exe_name}.app',
@@ -106,4 +86,25 @@ if sys.platform == 'darwin':
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
         },
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        name=_exe_name,
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        version='version_info.txt',
     )

@@ -4,8 +4,8 @@
 
 ## Önemli Değişiklikler
 
-### Windows Onedir Dağıtım (Antivirüs Fix)
-Windows için **onefile .exe** yerine **onedir klasör** dağıtımına geçildi. PyInstaller'ın runtime temp extraction davranışı kaldırıldı — bu, Trend Micro ve benzeri AV'lerin false positive engellemesini çözer. Kullanıcı ZIP'i indirip klasöre çıkarır, içindeki `.exe`'ye tıklar.
+### Onefile .exe (Antivirüs Fix)
+**onedir** denemesi sonrası **onefile .exe**'ye dönüldü. JAR gömme ve runtime hook'lar kaldırıldı — Trend Micro false positive'inin kaynağı buydu. Tek dosya `.exe`, temiz build.
 
 ### macOS Pydantic Düzeltmesi
 `optimize=2` Python bytecode optimizasyonu Pydantic v2'nin docstring bağımlılığını kırdığı için macOS `.app` çöküyordu. `optimize=1` ile düzeltildi.
@@ -14,7 +14,7 @@ Windows için **onefile .exe** yerine **onedir klasör** dağıtımına geçildi
 - Java 17/21 kuruluysa NeqSim otomatik algılanır, 15 EOS modeli aktif olur
 - Java yoksa sadece CoolProp/AGA8 backend'leri gösterilir (temiz UI)
 - Menüden "NeqSim Kurulum Bilgisi" ile Java kurulum talimatları alınabilir
-- JAR dosyaları onedir klasöründe normal dosya olarak bulunur — AV tetiklemez
+- JAR gömme kaldırıldı — NeqSim için kullanıcı `pip install neqsim` ile kendi kurar
 
 ### AV-dostu Java Algılama
 Runtime hook kaldırıldı. Java algılama artık `glob`/wildcard kullanmıyor — sadece `JAVA_HOME` env, `PATH` ve sabit bilinen dizinler.
@@ -23,7 +23,7 @@ Runtime hook kaldırıldı. Java algılama artık `glob`/wildcard kullanmıyor �
 
 | Platform | Format | Boyut |
 |----------|--------|-------|
-| Windows | `.zip` (onedir klasör) | ~55 MB |
+| Windows | `.zip` (onefile `.exe`) | ~55 MB |
 | macOS | `.dmg` (`.app` bundle) | ~55 MB |
 
 ## Test Altyapısı
