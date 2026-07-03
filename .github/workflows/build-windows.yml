@@ -58,18 +58,26 @@ jobs:
           pip install pytest pytest-timeout
           pytest tests/ --tb=short -x --timeout=60 -k "not ui and not neqsim" --ignore=tests/test_coverage_phase3_hard.py -p no:cacheprovider -o "addopts=-ra --strict-markers"
 
-      - name: Build Windows onefile
-        run: pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
-
-      - name: Zip executable
+      - name: Build Windows onedir (Folder mode)
         run: |
-          $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
-          $zipName = "Natural-Gas-Prop-${{ steps.get_version.outputs.VERSION }}-win64.zip"
-          Compress-Archive -Path "$($exe.FullName)" -DestinationPath "dist\$zipName"
+          pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
+          $folder = Get-ChildItem -Directory dist/* | Where-Object { $_.Name -like "Natural Gas Prop Main*" } | Select-Object -First 1
+          $zipName = "Natural-Gas-Prop-${{ steps.get_version.outputs.VERSION }}-win64-folder.zip"
+          Compress-Archive -Path "$($folder.FullName)" -DestinationPath "dist\$zipName"
+          Write-Output "Created: dist\$zipName"
+
+      - name: Build Windows Portable Python Bundle
+        run: |
+          python scripts/build_portable_windows.py
+          $zipName = "Natural-Gas-Prop-${{ steps.get_version.outputs.VERSION }}-win64-portable.zip"
+          Compress-Archive -Path "dist\Natural-Gas-Prop-Portable" -DestinationPath "dist\$zipName"
           Write-Output "Created: dist\$zipName"
 
       - name: Upload ZIP to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION }}
-          files: dist/Natural-Gas-Prop-*.zip
+          files: |
+            dist/Natural-Gas-Prop-*-win64-folder.zip
+            dist/Natural-Gas-Prop-*-win64-portable.zip
+
