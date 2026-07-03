@@ -10,11 +10,14 @@ from pathlib import Path
 import logging
 import os
 import tempfile
+from fpdf import FPDF
+
+
 class ReportGenerator:
     """Generates formatted text reports from calculation results."""
 
     @staticmethod
-    def _setup_pdf_font(pdf: "FPDF") -> str:
+    def _setup_pdf_font(pdf: FPDF) -> str:
         """
         Register a Unicode TrueType font for Turkish characters and symbols.
 
@@ -285,8 +288,6 @@ class ReportGenerator:
             file_path: Output PDF path
             plot_image_path: Optional path to phase envelope plot image
         """
-        from fpdf import FPDF  # lazy import to avoid numpy dependency at startup
-
         pdf = FPDF()
         pdf.add_page()
         font_family = ReportGenerator._setup_pdf_font(pdf)
