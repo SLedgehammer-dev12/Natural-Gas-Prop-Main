@@ -40,4 +40,27 @@ if __name__ == "__main__":
             f.write("CALL_MAIN\n")
     except Exception:
         pass
-    main()
+
+    try:
+        main()
+    except BaseException as exc:
+        import traceback as _traceback
+        tb = _traceback.format_exc()
+        try:
+            with open(_STARTUP_LOG, "a") as f:
+                f.write(f"FATAL: {exc}\n{tb}\n")
+        except Exception:
+            pass
+        import tkinter as _tk
+        try:
+            _root = _tk.Tk()
+            _root.withdraw()
+            _tk.messagebox.showerror(
+                "Beklenmeyen Hata",
+                f"Uygulama başlatılırken hata oluştu:\n\n{exc}\n\n"
+                f"Detaylar: {_STARTUP_LOG}"
+            )
+            _root.destroy()
+        except Exception:
+            pass
+        sys.exit(1)
