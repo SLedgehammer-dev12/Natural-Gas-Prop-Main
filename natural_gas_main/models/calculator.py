@@ -175,6 +175,7 @@ class ThermoCalculator:
         
         result = None
         used_backend = ""
+        neqsim_broken = False
         
         for backend in backends:
             try:
@@ -202,6 +203,15 @@ class ThermoCalculator:
                 
             except (StateUpdateError, ThermoCalculationError, ValueError, RuntimeError) as e:
                 self.logger.warning(f"Backend {backend} failed: {e}")
+                if isinstance(e, BackendNotAvailableError) and backend.startswith("neqsim-"):
+                    if "bulunamadı" in str(e) or "desteklemiyor" in str(e):
+                        if not neqsim_broken:
+                            neqsim_broken = True
+                            self.logger.warning(
+                                "NeqSim JVM/sınıf hatası — kalan NeqSim arka uçları atlanıyor."
+                            )
+                if neqsim_broken and backend.startswith("neqsim-"):
+                    continue
                 continue
         if result is None:
             result = self._calculate_z_only_fallback(
