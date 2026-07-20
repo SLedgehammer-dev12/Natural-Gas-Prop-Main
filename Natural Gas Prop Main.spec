@@ -80,8 +80,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.7.2',
-            'CFBundleVersion': '1.7.2.0',
+            'CFBundleShortVersionString': '1.7.3',
+            'CFBundleVersion': '1.7.3.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
