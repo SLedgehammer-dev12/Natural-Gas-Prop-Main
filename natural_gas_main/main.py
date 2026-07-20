@@ -26,7 +26,7 @@ def main():
     # Write startup marker for debugging
     startup_log = os.path.join(tempfile.gettempdir(), "ngp_startup.log")
     try:
-        with open(startup_log, "w") as f:
+        with open(startup_log, "a") as f:
             f.write(f"STARTING Natural Gas Prop Main {config.APP_VERSION}\n")
             f.write(f"Python: {sys.version}\n")
     except Exception:

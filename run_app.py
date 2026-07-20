@@ -31,6 +31,27 @@ try:
 except Exception:
     pass
 
+# Diagnostic: test CoolProp import early
+try:
+    with open(_STARTUP_LOG, "a") as f:
+        f.write("LOG_READY\n")
+except Exception:
+    pass
+try:
+    import tkinter as _tk_diag
+    with open(_STARTUP_LOG, "a") as f:
+        f.write("TKINTER_IMPORT_OK\n")
+except Exception as _e:
+    with open(_STARTUP_LOG, "a") as f:
+        f.write(f"TKINTER_IMPORT_FAIL: {_e}\n")
+try:
+    import CoolProp.CoolProp as _cp_diag
+    with open(_STARTUP_LOG, "a") as f:
+        f.write("COOLPROP_IMPORT_OK\n")
+except Exception as _e:
+    with open(_STARTUP_LOG, "a") as f:
+        f.write(f"COOLPROP_IMPORT_FAIL: {type(_e).__name__}: {_e}\n")
+
 # Import and run main
 from natural_gas_main.main import main
 
