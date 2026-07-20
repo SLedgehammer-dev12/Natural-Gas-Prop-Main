@@ -27,7 +27,12 @@ a = Analysis(
     binaries=[],
     datas=[(str(customtkinter_path), 'customtkinter/')],
     hiddenimports=[
+        'CoolProp',
         'CoolProp.CoolProp',
+        'CoolProp.State',
+        'CoolProp.constants',
+        'CoolProp.HumidAirProp',
+        'CoolProp.Plots',
         'matplotlib.backends.backend_tkagg',
         'PIL',
         'fpdf',
@@ -36,7 +41,7 @@ a = Analysis(
         'packaging',
         'pydantic',
     ],
-    hookspath=[],
+    hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=['neqsim'],
@@ -49,7 +54,8 @@ if sys.platform == 'darwin':
     exe = EXE(
         pyz,
         a.scripts,
-        exclude_binaries=True,
+        a.binaries,
+        a.datas,
         name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
@@ -64,17 +70,8 @@ if sys.platform == 'darwin':
         codesign_identity=None,
         entitlements_file=None,
     )
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.datas,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        name=_exe_name,
-    )
     app = BUNDLE(
-        coll,
+        exe,
         name=f'{_exe_name}.app',
         icon=None,
         bundle_identifier='com.kompresorpompa.naturalgasprop',
@@ -91,7 +88,8 @@ else:
     exe = EXE(
         pyz,
         a.scripts,
-        exclude_binaries=True,
+        a.binaries,
+        a.datas,
         name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
@@ -107,13 +105,3 @@ else:
         entitlements_file=None,
         version='version_info.txt',
     )
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.datas,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        name=_exe_name,
-    )
-
