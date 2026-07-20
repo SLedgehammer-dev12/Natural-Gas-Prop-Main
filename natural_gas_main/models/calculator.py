@@ -36,6 +36,7 @@ from natural_gas_main.models.neqsim_calculator import (
     NEQSIM_AVAILABLE,
     NEQSIM_AVAILABLE_BACKENDS,
     NEQSIM_EOS_REGISTRY,
+    NEQSIM_GAS_MAPPING,
     get_neqsim_iso6976,
     get_neqsim_hydrate_temperature,
 )
@@ -290,6 +291,8 @@ class ThermoCalculator:
             self.logger.info(
                 "Non-AGA8 bileşenler tespit edildi, GERG-2008/AGA8-Detail atlanıyor."
             )
+        if non_aga8 and preferred in ("GERG-2008", "AGA8-Detail"):
+            backends = []
 
         if is_neqsim_preferred:
             # If NeqSim is preferred, fallback through other NeqSim EOS first,
@@ -311,11 +314,6 @@ class ThermoCalculator:
                 if fb not in backends:
                     backends.append(fb)
         else:
-            non_aga8 = self._has_non_aga8_components(mixture)
-            if non_aga8:
-                self.logger.info(
-                    "Non-AGA8 bileşenler tespit edildi, GERG-2008/AGA8-Detail atlanıyor."
-                )
             all_fallbacks = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
             for fb in all_fallbacks:
                 if fb == "HEOS" and heos_incompatible:
@@ -375,23 +373,24 @@ class ThermoCalculator:
             ppr, tpr = float('nan'), float('nan')
             self.logger.debug("Pseudo-critical properties could not be calculated")
 
-        # 2. Add GERG-2008 & AGA8-Detail
-        for method in ["GERG-2008", "AGA8-Detail"]:
-            try:
-                res = calculate_aga8(mixture, temperature_k, pressure_pa, method)
-                comparisons.append(ZFactorComparison(
-                    method=method,
-                    z_factor=res.compressibility_factor,
-                    density=res.density,
-                    molar_mass=res.molar_mass,
-                    enthalpy=res.enthalpy,
-                    entropy=res.entropy,
-                    cp=res.cp,
-                    cv=res.cv,
-                    ppr=ppr, tpr=tpr, valid=True, warning=None
-                ))
-            except Exception as e:
-                self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
+        # 2. Add GERG-2008 & AGA8-Detail (skip if non-AGA8 components present)
+        if not self._has_non_aga8_components(mixture):
+            for method in ["GERG-2008", "AGA8-Detail"]:
+                try:
+                    res = calculate_aga8(mixture, temperature_k, pressure_pa, method)
+                    comparisons.append(ZFactorComparison(
+                        method=method,
+                        z_factor=res.compressibility_factor,
+                        density=res.density,
+                        molar_mass=res.molar_mass,
+                        enthalpy=res.enthalpy,
+                        entropy=res.entropy,
+                        cp=res.cp,
+                        cv=res.cv,
+                        ppr=ppr, tpr=tpr, valid=True, warning=None
+                    ))
+                except Exception as e:
+                    self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
 
         # 2.5 Add NeqSim backends for comparison
         for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
@@ -1501,3 +1500,54 @@ class ThermoCalculator:
             normal_volume=volume_norm,
             normal_volume_error=error_msg
         )
+
+
+def check_gas_backend_support(gas_name: str, backend: str) -> tuple:
+    """
+    Check if a single gas component is supported by the given backend.
+
+    Args:
+        gas_name: Display name of the gas (e.g. "Methane", "Cyclopentane").
+        backend: Backend identifier (e.g. "HEOS", "GERG-2008", "neqsim-srk").
+
+    Returns:
+        Tuple of (is_supported: bool, reason: str or None).
+    """
+    coolprop_name = GasMixture._format_gas_name_for_coolprop(gas_name).lower()
+
+    if backend in ("GERG-2008", "AGA8-Detail"):
+        if coolprop_name in AGA8_MAPPING:
+            return True, None
+        return False, "AGA8 standardında tanımlı değil"
+
+    if backend.startswith("neqsim-"):
+        if coolprop_name in NEQSIM_GAS_MAPPING:
+            return True, None
+        return False, "NeqSim veritabanında yok"
+
+    if backend == "HEOS":
+        heos_compatible = [g.lower() for g in config.HEOS_COMPATIBLE_GASES]
+        if coolprop_name in heos_compatible:
+            return True, None
+        return False, "HEOS ikili etkileşim parametresi eksik"
+
+    return True, None
+
+
+def get_unsupported_gases_for_backend(gas_names: list, backend: str) -> list:
+    """
+    Get list of gas display names not supported by the given backend.
+
+    Args:
+        gas_names: List of gas display names.
+        backend: Backend identifier.
+
+    Returns:
+        List of unsupported gas display names.
+    """
+    unsupported = []
+    for name in gas_names:
+        supported, _ = check_gas_backend_support(name, backend)
+        if not supported:
+            unsupported.append(name)
+    return unsupported

@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 
 from natural_gas_main.models.gas_data import GasComponent, GasMixture
 from natural_gas_main.models.neqsim_calculator import NEQSIM_EOS_REGISTRY
+from natural_gas_main.models.calculator import check_gas_backend_support, get_unsupported_gases_for_backend
 from natural_gas_main.core.exceptions import ValidationError
 from natural_gas_main.core import validators
 from natural_gas_main.core import converters
@@ -93,6 +94,26 @@ class InputPanel(ctk.CTkFrame):
             command=self._on_gas_search
         )
         self.filter_switch.pack(anchor="w", pady=(0, 5))
+
+        # Backend compatibility filter toggle
+        self.backend_filter_var = ctk.BooleanVar(value=True)
+        self.backend_filter_switch = ctk.CTkSwitch(
+            left_frame,
+            text="Yalnızca Yöntem Gazları",
+            variable=self.backend_filter_var,
+            font=ctk.CTkFont(size=11),
+            command=self._on_gas_search
+        )
+        self.backend_filter_switch.pack(anchor="w", pady=(0, 2))
+
+        # Gas count label
+        self.gas_count_label = ctk.CTkLabel(
+            left_frame,
+            text="",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        self.gas_count_label.pack(anchor="w", pady=(0, 5))
         
         # Gas Listbox (fallback to standard tk.Listbox for now, CTk doesn't have a native one)
         list_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
@@ -347,23 +368,50 @@ class InputPanel(ctk.CTkFrame):
             text_color="gray"
         )
         self.backend_info_label.grid(row=3, column=1, columnspan=2, padx=(0, 10), pady=(0, 5), sticky="w")
+
+        # Compatibility status label
+        self.compat_status_label = ctk.CTkLabel(
+            volume_frame,
+            text="",
+            font=ctk.CTkFont(size=10, weight="bold")
+        )
+        self.compat_status_label.grid(row=4, column=1, columnspan=2, padx=(0, 10), pady=(0, 5), sticky="w")
         
         # Trace backend selection to show description
         self.method.trace_add("write", self._on_backend_change)
         self._on_backend_change()
 
     def _get_filtered_gas_list(self):
-        """Return the gas list based on the filter switch."""
+        """Return the gas list based on filter switch and backend compatibility."""
         common = set(config.NATURAL_GAS_FOCUS_LIST)
         if self.filter_var.get():
-            return [g for g in self.gas_list if g in common]
-        return self.gas_list
+            result = [g for g in self.gas_list if g in common]
+        else:
+            result = list(self.gas_list)
+
+        if self.backend_filter_var.get():
+            backend = self.method.get()
+            result = [g for g in result if check_gas_backend_support(g, backend)[0]]
+
+        return result
+
+    def _get_backend_compatible_gas_list(self):
+        """Return only gases compatible with the currently selected backend."""
+        backend = self.method.get()
+        return [g for g in self.gas_list if check_gas_backend_support(g, backend)[0]]
 
     def _update_gas_list(self):
-        """Update gas listbox with available gases."""
+        """Update gas listbox with available gases and count label."""
         self.gas_listbox.delete(0, tk.END)
-        for gas in self._get_filtered_gas_list():
+        filtered = self._get_filtered_gas_list()
+        for gas in filtered:
             self.gas_listbox.insert(tk.END, gas)
+        total = len(self.gas_list)
+        shown = len(filtered)
+        if shown < total:
+            self.gas_count_label.configure(text=f"{shown}/{total} gaz gösteriliyor")
+        else:
+            self.gas_count_label.configure(text=f"{total} gaz")
     
     # Event handlers
     
@@ -381,6 +429,8 @@ class InputPanel(ctk.CTkFrame):
         else:
             for gas in base_list:
                 self.gas_listbox.insert(tk.END, gas)
+        shown = len(self.gas_listbox.get(0, tk.END))
+        self.gas_count_label.configure(text=f"{shown} gaz listeleniyor")
     
     def _on_add_gas(self):
         """Handle add gas button click."""
@@ -417,7 +467,12 @@ class InputPanel(ctk.CTkFrame):
         row_frame.pack(fill=tk.X, pady=2)
         
         # Name Label
-        ctk.CTkLabel(row_frame, text=gas_name, width=120, anchor="w").pack(side=tk.LEFT)
+        name_label = ctk.CTkLabel(row_frame, text=gas_name, width=110, anchor="w")
+        name_label.pack(side=tk.LEFT)
+        
+        # Compatibility indicator
+        compat_label = ctk.CTkLabel(row_frame, text="", width=18, font=("", 10))
+        compat_label.pack(side=tk.LEFT)
         
         # Fraction Entry
         var = ctk.StringVar(value=fraction_value)
@@ -436,8 +491,11 @@ class InputPanel(ctk.CTkFrame):
         self.comp_rows[gas_name] = {
             'frame': row_frame,
             'entry': entry,
-            'var': var
+            'var': var,
+            'name_label': name_label,
+            'compat_label': compat_label
         }
+        self._update_backend_compatibility()
 
     def _on_remove_gas(self, gas_name: str):
         """Handle remove gas button click."""
@@ -445,6 +503,8 @@ class InputPanel(ctk.CTkFrame):
             self.comp_rows[gas_name]['frame'].destroy()
             del self.comp_rows[gas_name]
             self._update_total_label()
+        self._update_backend_compatibility()
+        self._on_gas_search()
 
     def _on_clear_all(self):
         """Clear all gases from composition."""
@@ -452,6 +512,7 @@ class InputPanel(ctk.CTkFrame):
             row['frame'].destroy()
         self.comp_rows.clear()
         self._update_total_label()
+        self._update_backend_compatibility()
         
     def _on_preset_selected(self, choice):
         """Auto-fill gas composition based on selected preset."""
@@ -725,7 +786,7 @@ class InputPanel(ctk.CTkFrame):
         self.method.set(backend)
     
     def _on_backend_change(self, *args):
-        """Update backend info label when selection changes."""
+        """Update backend info label and compatibility indicators when selection changes."""
         backend = self.method.get()
         if backend in NEQSIM_EOS_REGISTRY:
             info = NEQSIM_EOS_REGISTRY[backend]
@@ -742,7 +803,38 @@ class InputPanel(ctk.CTkFrame):
             }
             group = groups.get(backend, "CoolProp/AGA8")
             self.backend_info_label.configure(text=f"[{group}]")
-    
+        self._update_backend_compatibility()
+        self._on_gas_search()
+
+    def _update_backend_compatibility(self):
+        """Update gas row color indicators and status label based on backend support."""
+        backend = self.method.get()
+        unsupported = []
+        for gas_name, row in self.comp_rows.items():
+            supported, reason = check_gas_backend_support(gas_name, backend)
+            if supported:
+                row['name_label'].configure(text_color=None)
+                row['compat_label'].configure(text="✓", text_color="#4CAF50")
+            else:
+                row['name_label'].configure(text_color="#FF9800")
+                row['compat_label'].configure(text="✗", text_color="#F44336")
+                unsupported.append(gas_name)
+
+        if unsupported:
+            names = ", ".join(unsupported)
+            total = len(self.comp_rows)
+            self.compat_status_label.configure(
+                text=f"⚠ {len(unsupported)}/{total} bileşen desteklenmiyor: {names}",
+                text_color="#FF9800"
+            )
+        elif self.comp_rows:
+            self.compat_status_label.configure(
+                text="✓ Tüm bileşenler bu yöntemle uyumlu",
+                text_color="#4CAF50"
+            )
+        else:
+            self.compat_status_label.configure(text="")
+
     def get_all_inputs(self) -> dict:
         """
         Get all inputs as dictionary.
