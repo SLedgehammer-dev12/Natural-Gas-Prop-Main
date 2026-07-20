@@ -38,78 +38,139 @@ jobs:
           pip install neqsim
           pip install pyinstaller pyinstaller-hooks-contrib
 
-      - name: Build onedir (folder)
+      - name: Build onedir
         shell: pwsh
         run: |
-          Write-Host "Building onedir..."
           pyinstaller "Natural Gas Prop Main.spec" --clean
           $dir = Get-ChildItem "dist\Natural Gas Prop Main v*" -Directory | Select-Object -First 1
-          $zip = "dist\Natural-Gas-Prop-win64-folder.zip"
+          $zip = "dist\Natural-Gas-Prop-win64.zip"
           Compress-Archive -Path "$($dir.FullName)\*" -DestinationPath $zip -Force
-          Write-Host "Onedir built: $zip"
 
-      - name: Build onefile (standalone)
+      - name: Build onefile
         shell: pwsh
         run: |
-          Write-Host "Building onefile..."
           pyinstaller "Natural Gas Prop Main onefile.spec" --clean
           $exe = Get-ChildItem "dist\*.exe" | Select-Object -First 1
-          $dest = "dist\Natural Gas Prop Main onefile.exe"
-          Copy-Item $exe.FullName $dest -Force
-          Write-Host "Onefile built: $dest"
+          Copy-Item $exe.FullName "dist\Natural Gas Prop.exe" -Force
 
       - name: Read version
         id: read_version
         shell: pwsh
         run: |
           $v = (Get-Content version.json | ConvertFrom-Json).version
-          Write-Host "Version: $v"
           echo "version=$v" >> $env:GITHUB_OUTPUT
 
-      - name: Upload onedir artifact
+      - name: Upload onedir
         uses: actions/upload-artifact@v4
         with:
           name: windows-onedir
-          path: dist/Natural-Gas-Prop-win64-folder.zip
-          if-no-files-found: error
+          path: dist/Natural-Gas-Prop-win64.zip
 
-      - name: Upload onefile artifact
+      - name: Upload onefile
         uses: actions/upload-artifact@v4
         with:
           name: windows-onefile
-          path: dist/Natural Gas Prop Main onefile.exe
-          if-no-files-found: error
+          path: dist/Natural Gas Prop.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install wheel setuptools
+          pip3 install CoolProp numpy pydantic customtkinter matplotlib fpdf2 pyaga8 packaging
+          pip3 install neqsim
+          pip3 install pyinstaller pyinstaller-hooks-contrib
+
+      - name: Build macOS .app
+        run: |
+          pyinstaller "Natural Gas Prop Main.spec" --clean
+          ls -la dist/
+
+      - name: Create .dmg
+        run: |
+          APP_DIR=$(ls -d dist/*.app 2>/dev/null | head -1)
+          if [ -n "$APP_DIR" ]; then
+            APP_NAME=$(basename "$APP_DIR" .app)
+            DMG_NAME="dist/${APP_NAME}.dmg"
+            hdiutil create -volname "Natural Gas Prop" \
+              -srcfolder dist/$APP_NAME.app \
+              -ov -format UDZO "$DMG_NAME"
+            ls -la "$DMG_NAME"
+          else
+            echo "No .app found, listing dist/"
+            ls -la dist/
+            # Bundle might be inside a subdirectory
+            APP_DIR=$(find dist -name "*.app" -type d | head -1)
+            if [ -n "$APP_DIR" ]; then
+              DMG_NAME="dist/Natural-Gas-Prop.dmg"
+              hdiutil create -volname "Natural Gas Prop" \
+                -srcfolder "$APP_DIR" \
+                -ov -format UDZO "$DMG_NAME"
+              ls -la "$DMG_NAME"
+            fi
+          fi
+
+      - name: Upload .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/*.dmg
+          if-no-files-found: warn
 
   release:
-    needs: build-windows
+    needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'push' && contains(github.event.head_commit.message, 'version bump')) ||
       github.event_name == 'workflow_dispatch'
     steps:
-      - name: Download onedir artifact
+      - name: Download windows-onedir
         uses: actions/download-artifact@v4
         with:
           name: windows-onedir
           path: dist
 
-      - name: Download onefile artifact
+      - name: Download windows-onefile
         uses: actions/download-artifact@v4
         with:
           name: windows-onefile
           path: dist
 
-      - name: List dist
-        run: ls -la dist/
+      - name: Download macos-dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist
+
+      - name: Rename assets
+        run: |
+          mkdir -p out
+          VERSION="${{ needs.build-windows.outputs.version }}"
+          # Windows
+          cp "dist/Natural Gas Prop.exe" "out/Natural Gas Prop ${VERSION}.exe" 2>/dev/null || true
+          cp dist/Natural-Gas-Prop-win64.zip "out/Natural Gas Prop ${VERSION} (Windows).zip" 2>/dev/null || true
+          # macOS
+          DMG=$(ls dist/*.dmg 2>/dev/null | head -1)
+          if [ -n "$DMG" ]; then
+            cp "$DMG" "out/Natural Gas Prop ${VERSION}.dmg" 2>/dev/null || true
+          fi
+          ls -la out/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build-windows.outputs.version }}
           name: Natural Gas Prop ${{ needs.build-windows.outputs.version }}
-          files: |
-            dist/Natural Gas Prop Main onefile.exe
-            dist/Natural-Gas-Prop-win64-folder.zip
+          files: out/*
           draft: false
           prerelease: false
         env:
