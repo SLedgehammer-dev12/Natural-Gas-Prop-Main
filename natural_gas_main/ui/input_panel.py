@@ -814,10 +814,12 @@ class InputPanel(ctk.CTkFrame):
             return
         backend = self.method.get()
         unsupported = []
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        default_fg = "#DCE4EE" if is_dark else "#1A1A1A"
         for gas_name, row in self.comp_rows.items():
             supported, reason = check_gas_backend_support(gas_name, backend)
             if supported:
-                row['name_label'].configure(text_color=("CTkLabel", "text_color"))
+                row['name_label'].configure(text_color=default_fg)
                 row['compat_label'].configure(text="✓", text_color="#4CAF50")
             else:
                 row['name_label'].configure(text_color="#FF9800")
