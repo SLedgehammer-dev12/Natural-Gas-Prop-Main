@@ -28,17 +28,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller pytest pytest-cov
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install pyinstaller pytest pytest-cov
+          python -m pip check
+          python -c "import numpy, matplotlib; print('NumPy:', numpy.__version__, numpy.__file__); print('Matplotlib:', matplotlib.__version__)"
 
       - name: Remove NeqSim (no Java JVM on CI)
-        run: pip uninstall -y neqsim 2>/dev/null || true
+        run: python -m pip uninstall -y neqsim 2>/dev/null || true
 
       - name: Run tests (skip NeqSim - no Java JVM on CI)
-        run: pytest --ignore=tests/test_neqsim_calculator.py --ignore=tests/test_neqsim_calculator_edge.py -q
+        run: python -m pytest --ignore=tests/test_neqsim_calculator.py --ignore=tests/test_neqsim_calculator_edge.py -q
 
       - name: Build .app bundle
-        run: pyinstaller "Natural Gas Prop Main.spec" --clean --noconfirm
+        run: python -m PyInstaller "Natural Gas Prop Main.spec" --clean --noconfirm
 
       - name: Create .dmg
         run: |
