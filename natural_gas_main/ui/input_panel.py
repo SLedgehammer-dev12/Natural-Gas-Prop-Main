@@ -817,7 +817,7 @@ class InputPanel(ctk.CTkFrame):
         for gas_name, row in self.comp_rows.items():
             supported, reason = check_gas_backend_support(gas_name, backend)
             if supported:
-                row['name_label'].configure(text_color=None)
+                row['name_label'].configure(text_color=("CTkLabel", "text_color"))
                 row['compat_label'].configure(text="✓", text_color="#4CAF50")
             else:
                 row['name_label'].configure(text_color="#FF9800")
