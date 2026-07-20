@@ -1,3 +1,26 @@
+# Natural Gas Prop Main v1.7.2
+
+**Tarih:** 3 Temmuz 2026
+
+## Önemli Değişiklikler
+
+### Windows Antivirüs ve Kısıtlı Kullanıcı Uyumlaştırması (AV & Non-Admin Fix)
+- **Official Gömülü Python Sürümü (`win64-portable`)**: Kurumsal bilgisayarlarda admin yetkisi olmadan ve antivirüs engeline takılmadan çalışabilmesi için resmi imzalı Python gömülü dağıtımı ve arka planda sessizce başlatan `Natural Gas Prop.vbs` başlatıcısı eklendi.
+- **Klasör Yapılı PyInstaller Sürümü (`win64-folder`)**: PyInstaller tek dosya (`onefile`) paketlemesinden kaynaklanan geçici dizin (`%TEMP%`) yetki ve antivirüs engellemelerini aşmak için klasör yapılı (`onedir`) dağıtım seçeneği eklendi.
+
+### Sürüm ve Mobil Senkronizasyonu
+- Mobil uygulama (Chaquopy/Gradle yapılandırmaları) ve tüm konfigürasyon dosyaları masaüstü sürümüyle senkronize edilerek `v1.7.2` sürümüne yükseltildi.
+
+## Build & Dağıtım
+
+| Platform | Format | Boyut | Açıklama |
+|----------|--------|-------|----------|
+| Windows | `.zip` (gömülü portable Python) | ~70 MB | Kurumsal / AV korumalı / Sessiz VBS |
+| Windows | `.zip` (onedir klasör) | ~65 MB | Standart klasör yapılı derleme |
+| macOS | `.dmg` (`.app` bundle) | ~55 MB | Standart macOS sürümü |
+
+---
+
 # Natural Gas Prop Main v1.7.1
 
 **Tarih:** Temmuz 2026

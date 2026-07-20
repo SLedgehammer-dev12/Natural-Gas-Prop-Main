@@ -1,4 +1,4 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
 
 import pathlib
 import sys
@@ -80,8 +80,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.7.1',
-            'CFBundleVersion': '1.7.1.0',
+            'CFBundleShortVersionString': '1.7.2',
+            'CFBundleVersion': '1.7.2.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
@@ -91,8 +91,7 @@ else:
     exe = EXE(
         pyz,
         a.scripts,
-        a.binaries,
-        a.datas,
+        exclude_binaries=True,
         name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
@@ -100,7 +99,7 @@ else:
         upx=False,
         upx_exclude=[],
         runtime_tmpdir=None,
-        console=True,
+        console=False,
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,
@@ -108,3 +107,13 @@ else:
         entitlements_file=None,
         version='version_info.txt',
     )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name=_exe_name,
+    )
+

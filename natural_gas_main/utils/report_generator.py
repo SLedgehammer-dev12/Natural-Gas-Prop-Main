@@ -71,6 +71,18 @@ class ReportGenerator:
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
             ),
             (
+                "RobotoAndroid",
+                "/system/fonts/Roboto-Regular.ttf",
+                "/system/fonts/Roboto-Bold.ttf",
+                "/system/fonts/Roboto-Italic.ttf",
+            ),
+            (
+                "NotoSansAndroid",
+                "/system/fonts/NotoSans-Regular.ttf",
+                "/system/fonts/NotoSans-Bold.ttf",
+                "/system/fonts/NotoSans-Italic.ttf",
+            ),
+            (
                 "LiberationLinux",
                 "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -87,7 +99,7 @@ class ReportGenerator:
             return family
 
         raise RuntimeError(
-            "PDF raporu için Unicode font bulunamadı. DejaVu Sans veya Windows Arial/Segoe UI fontları gerekli."
+            "PDF raporu için Unicode font bulunamadı. Android Roboto/NotoSans veya DejaVu Sans, Windows Arial/Segoe UI fontları gerekli."
         )
     
     @staticmethod

@@ -114,9 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.7.1 - Profesyonel Sürüm\n\n"
-        "v1.7.1 sürümü: Windows onedir dağıtım (AV fix),\n"
-        "NeqSim 15 EOS (Java 21+), optimize=1 macOS düzeltmesi.\n\n"
+        "Sürüm v1.7.2 - Profesyonel Sürüm\n\n"
+        "v1.7.2 sürümü: Windows gelismis AV korumali\n"
+        "tasinabilir Python ve onedir klasor yapisi destegi.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa"
     )
@@ -229,7 +229,22 @@ def show_new_features_info() -> None:
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.7.1":
+    if version == "v1.7.2":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
+            "• Gelişmiş AV Koruması ve Taşınabilir Paketler:\n"
+            "  Windows için resmi imzalı Python gömülü dağıtımı\n"
+            "  (win64-portable) ve sessiz başlatıcı (.vbs) eklendi.\n"
+            "  Böylece kurumsal antivirüs engellemeleri tamamen aşılır.\n\n"
+            "• Klasör Yapılı Dağıtım (onedir):\n"
+            "  Temp klasöründen çalıştırma yapılmadığı için güvenlik\n"
+            "  politikalarına tam uyumludur.\n\n"
+            "• Mobil & Masaüstü Senkronizasyonu:\n"
+            "  Mobil uygulama ve tüm konfigürasyonlar v1.7.2 olarak\n"
+            "  sürüm uyumlu hale getirildi.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.7.1":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Yeni Dağıtım Modeli (Windows): Tek .exe yerine\n"

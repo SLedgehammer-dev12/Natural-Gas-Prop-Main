@@ -65,3 +65,13 @@ Natural Gas Prop Main/
 *.log.*
 dist_debug/
 dist_debug2/
+
+# Mobile App Exclusions
+Mobile App/jdk/
+Mobile App/.gradle/
+Mobile App/.kotlin/
+Mobile App/local.properties
+Mobile App/app/build/
+Mobile App/build/
+*.apk
+
