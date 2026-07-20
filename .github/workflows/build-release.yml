@@ -99,24 +99,14 @@ jobs:
         run: |
           APP_DIR=$(ls -d dist/*.app 2>/dev/null | head -1)
           if [ -n "$APP_DIR" ]; then
-            APP_NAME=$(basename "$APP_DIR" .app)
-            DMG_NAME="dist/${APP_NAME}.dmg"
+            DMG_NAME="dist/Natural-Gas-Prop.dmg"
             hdiutil create -volname "Natural Gas Prop" \
-              -srcfolder dist/$APP_NAME.app \
-              -ov -format UDZO "$DMG_NAME"
+              -srcfolder "$APP_DIR" \
+              -ov "$DMG_NAME"
             ls -la "$DMG_NAME"
           else
-            echo "No .app found, listing dist/"
+            echo "No .app found"
             ls -la dist/
-            # Bundle might be inside a subdirectory
-            APP_DIR=$(find dist -name "*.app" -type d | head -1)
-            if [ -n "$APP_DIR" ]; then
-              DMG_NAME="dist/Natural-Gas-Prop.dmg"
-              hdiutil create -volname "Natural Gas Prop" \
-                -srcfolder "$APP_DIR" \
-                -ov -format UDZO "$DMG_NAME"
-              ls -la "$DMG_NAME"
-            fi
           fi
 
       - name: Upload .dmg
