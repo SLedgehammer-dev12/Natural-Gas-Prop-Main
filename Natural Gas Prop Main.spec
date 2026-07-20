@@ -7,19 +7,6 @@ import re
 import customtkinter
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
 
-# --- CoolProp explicit collection ---
-import CoolProp
-_coolprop_dir = os.path.dirname(CoolProp.__file__)
-_coolprop_binaries = []
-_coolprop_datas = []
-for _f in os.listdir(_coolprop_dir):
-    _fp = os.path.join(_coolprop_dir, _f)
-    if os.path.isfile(_fp):
-        if _f.endswith(('.pyd', '.dll', '.so')):
-            _coolprop_binaries.append((_fp, 'CoolProp'))
-        elif _f.endswith('.py') and not _f.startswith('test'):
-            _coolprop_datas.append((_fp, 'CoolProp'))
-
 # Read version from version_info.txt for output naming
 _version = "unknown"
 _version_info_path = pathlib.Path("version_info.txt")
@@ -38,15 +25,14 @@ _exe_name = f"Natural Gas Prop Main {_version}" if _version != "unknown" else "N
 a = Analysis(
     ['run_app.py'],
     pathex=[],
-    binaries=_coolprop_binaries,
-    datas=[(str(customtkinter_path), 'customtkinter/')] + _coolprop_datas,
+    binaries=[],
+    datas=[(str(customtkinter_path), 'customtkinter/')],
     hiddenimports=[
         'CoolProp',
         'CoolProp.CoolProp',
         'CoolProp.State',
         'CoolProp.constants',
         'CoolProp.HumidAirProp',
-        'CoolProp.Plots',
         'matplotlib.backends.backend_tkagg',
         'PIL',
         'fpdf',
@@ -58,7 +44,12 @@ a = Analysis(
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['neqsim'],
+    excludes=[
+        'neqsim',
+        'CoolProp.tests',
+        'CoolProp.Plots',
+        'CoolProp.GUI',
+    ],
     noarchive=False,
     optimize=1,
 )
@@ -68,8 +59,7 @@ if sys.platform == 'darwin':
     exe = EXE(
         pyz,
         a.scripts,
-        a.binaries,
-        a.datas,
+        exclude_binaries=True,
         name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
@@ -84,8 +74,17 @@ if sys.platform == 'darwin':
         codesign_identity=None,
         entitlements_file=None,
     )
-    app = BUNDLE(
+    coll = COLLECT(
         exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name=_exe_name,
+    )
+    app = BUNDLE(
+        coll,
         name=f'{_exe_name}.app',
         icon=None,
         bundle_identifier='com.kompresorpompa.naturalgasprop',
@@ -102,8 +101,7 @@ else:
     exe = EXE(
         pyz,
         a.scripts,
-        a.binaries,
-        a.datas,
+        exclude_binaries=True,
         name=_exe_name,
         debug=False,
         bootloader_ignore_signals=False,
@@ -118,4 +116,13 @@ else:
         codesign_identity=None,
         entitlements_file=None,
         version='version_info.txt',
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name=_exe_name,
     )
