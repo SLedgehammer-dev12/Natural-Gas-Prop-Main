@@ -114,9 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.7.2 - Profesyonel Sürüm\n\n"
-        "v1.7.2 sürümü: Windows gelismis AV korumali\n"
-        "tasinabilir Python ve onedir klasor yapisi destegi.\n\n"
+        "Sürüm v1.7.3 - Profesyonel Sürüm\n\n"
+        "v1.7.3 sürümü: Backend-gaz uyumluluk gostergeleri,\n"
+        "dinamik gaz listesi, AGA8 log duzeltmeleri.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa"
     )
@@ -229,7 +229,27 @@ def show_new_features_info() -> None:
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.7.2":
+    if version == "v1.7.3":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
+            "• Backend-Gaz Uyumluluk Göstergeleri:\n"
+            "  Her gaz satırında yeşil ✓ / kırmızı ✗ uyumluluk simgesi.\n"
+            "  Uyumsuz gazlar turuncu renkte, özet uyarı etiketi eklendi.\n\n"
+            "• Dinamik Gaz Listesi:\n"
+            "  'Yalnızca Yöntem Gazları' toggle ile seçilen backend'e\n"
+            "  uygun gazlar otomatik filtreleniyor (GERG-2008 → 21 bileşen).\n"
+            "  Gaz sayacı etiketi: '38/132 gaz gösteriliyor'.\n\n"
+            "• Backend-Gaz Uyumluluk API'si:\n"
+            "  check_gas_backend_support() ve get_unsupported_gases_for_backend()\n"
+            "  fonksiyonları ile programatik uyumluluk kontrolü.\n\n"
+            "🔧 DÜZELTMELER:\n"
+            "• AGA8 log düzeltmeleri: Çifte 'Non-AGA8 bileşenler' logu kaldırıldı.\n"
+            "• Preferred backend GERG-2008/AGA8-Detail, non-AGA8 karışımlarda\n"
+            "  artık backends listesinden doğru şekilde çıkarılıyor.\n"
+            "• Z-factor karşılaştırmasında non-AGA8 karışımlar için AGA8 atlanıyor.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.7.2":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Gelişmiş AV Koruması ve Taşınabilir Paketler:\n"

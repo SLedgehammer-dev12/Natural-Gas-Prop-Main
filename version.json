@@ -1,7 +1,7 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.7.2",
-  "date": "2026-07-03",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.2",
-  "changelog": "- Windows: Gelismis AV Korumasi icin resmi imzali tasinabilir Python (win64-portable) ve sessiz baslatici (.vbs) eklendi.\n- Windows: onedir klasor dagitimi ile gecici dizinden calistirma engellendi.\n- Mobil & Masaustu: Surumler v1.7.2 olarak senkronize edildi."
+  "version": "v1.7.3",
+  "date": "2026-07-20",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.3",
+  "changelog": "- Backend-gaz uyumluluk gostergeleri: Yesil/Kirmizi simge, turuncu uyari etiketi.\n- Dinamik gaz listesi: 'Yalnizca Yontem Gazlari' toggle ile backend filtreleme.\n- Backend-gas uyumluluk API'si: check_gas_backend_support() ve get_unsupported_gases_for_backend().\n- Duzeltme: Cifte 'Non-AGA8 bilesenler' logu kaldirildi.\n- Duzeltme: Preferred backend GERG-2008/AGA8-Detail non-AGA8 karisimda listeden cikariliyor.\n- Duzeltme: Z-factor karsilastirmasinda non-AGA8 karisimlarda AGA8 atlaniyor."
 }
