@@ -1,10 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 import pathlib
 import sys
 import re
 import customtkinter
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
+
+# --- CoolProp explicit collection ---
+import CoolProp
+_coolprop_dir = os.path.dirname(CoolProp.__file__)
+_coolprop_binaries = []
+_coolprop_datas = []
+for _f in os.listdir(_coolprop_dir):
+    _fp = os.path.join(_coolprop_dir, _f)
+    if os.path.isfile(_fp):
+        if _f.endswith(('.pyd', '.dll', '.so')):
+            _coolprop_binaries.append((_fp, 'CoolProp'))
+        elif _f.endswith('.py') and not _f.startswith('test'):
+            _coolprop_datas.append((_fp, 'CoolProp'))
 
 # Read version from version_info.txt for output naming
 _version = "unknown"
@@ -24,8 +38,8 @@ _exe_name = f"Natural Gas Prop Main {_version}" if _version != "unknown" else "N
 a = Analysis(
     ['run_app.py'],
     pathex=[],
-    binaries=[],
-    datas=[(str(customtkinter_path), 'customtkinter/')],
+    binaries=_coolprop_binaries,
+    datas=[(str(customtkinter_path), 'customtkinter/')] + _coolprop_datas,
     hiddenimports=[
         'CoolProp',
         'CoolProp.CoolProp',
