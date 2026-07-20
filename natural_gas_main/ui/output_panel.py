@@ -459,8 +459,8 @@ class OutputPanel(ctk.CTkFrame):
                 ("HEOS", "HEOS"),
                 ("SRK", "SRK"),
                 ("PR", "PR"),
-                ("Katz", "Standing-Katz ANN10"),
-                ("DAK", "Dranchuk-Abou-Kassem"),
+                ("Standing-Katz ANN10", "Katz ANN10"),
+                ("Dranchuk-Abou-Kassem", "DAK"),
             ]
             comp_map = {c.method: c for c in result.z_factor_comparison}
             
