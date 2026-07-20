@@ -389,7 +389,7 @@ class InputPanel(ctk.CTkFrame):
         else:
             result = list(self.gas_list)
 
-        if self.backend_filter_var.get():
+        if self.backend_filter_var.get() and hasattr(self, 'method'):
             backend = self.method.get()
             result = [g for g in result if check_gas_backend_support(g, backend)[0]]
 
@@ -397,6 +397,8 @@ class InputPanel(ctk.CTkFrame):
 
     def _get_backend_compatible_gas_list(self):
         """Return only gases compatible with the currently selected backend."""
+        if not hasattr(self, 'method'):
+            return list(self.gas_list)
         backend = self.method.get()
         return [g for g in self.gas_list if check_gas_backend_support(g, backend)[0]]
 
@@ -808,6 +810,8 @@ class InputPanel(ctk.CTkFrame):
 
     def _update_backend_compatibility(self):
         """Update gas row color indicators and status label based on backend support."""
+        if not hasattr(self, 'method'):
+            return
         backend = self.method.get()
         unsupported = []
         for gas_name, row in self.comp_rows.items():
