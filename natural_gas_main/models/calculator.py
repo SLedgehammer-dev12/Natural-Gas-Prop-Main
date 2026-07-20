@@ -403,36 +403,37 @@ class ThermoCalculator:
                     self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
 
         # 2.5 Add NeqSim backends for comparison
-        for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
-            if self._is_neqsim_backend(main_backend or "") and method == main_backend:
-                if main_actual is not None:
+        if NEQSIM_AVAILABLE:
+            for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
+                if self._is_neqsim_backend(main_backend or "") and method == main_backend:
+                    if main_actual is not None:
+                        comparisons.append(ZFactorComparison(
+                            method=method,
+                            z_factor=main_actual.compressibility_factor,
+                            density=main_actual.density,
+                            molar_mass=main_actual.molar_mass,
+                            enthalpy=main_actual.enthalpy,
+                            entropy=main_actual.entropy,
+                            cp=main_actual.cp,
+                            cv=main_actual.cv,
+                            ppr=ppr, tpr=tpr, valid=True, warning=None
+                        ))
+                    continue
+                try:
+                    res, _ = calculate_neqsim(mixture, temperature_k, pressure_pa, method)
                     comparisons.append(ZFactorComparison(
                         method=method,
-                        z_factor=main_actual.compressibility_factor,
-                        density=main_actual.density,
-                        molar_mass=main_actual.molar_mass,
-                        enthalpy=main_actual.enthalpy,
-                        entropy=main_actual.entropy,
-                        cp=main_actual.cp,
-                        cv=main_actual.cv,
+                        z_factor=res.compressibility_factor,
+                        density=res.density,
+                        molar_mass=res.molar_mass,
+                        enthalpy=res.enthalpy,
+                        entropy=res.entropy,
+                        cp=res.cp,
+                        cv=res.cv,
                         ppr=ppr, tpr=tpr, valid=True, warning=None
                     ))
-                continue
-            try:
-                res, _ = calculate_neqsim(mixture, temperature_k, pressure_pa, method)
-                comparisons.append(ZFactorComparison(
-                    method=method,
-                    z_factor=res.compressibility_factor,
-                    density=res.density,
-                    molar_mass=res.molar_mass,
-                    enthalpy=res.enthalpy,
-                    entropy=res.entropy,
-                    cp=res.cp,
-                    cv=res.cv,
-                    ppr=ppr, tpr=tpr, valid=True, warning=None
-                ))
-            except Exception as e:
-                self.logger.debug(f"NeqSim {method} comparison unavailable: {e}")
+                except Exception as e:
+                    self.logger.info(f"NeqSim {method} comparison skipped (NeqSim/JVM may not be available): {e}")
 
         # 3. Add HEOS, SRK, PR — reuse main result when available
         for method in ["HEOS", "SRK", "PR"]:
