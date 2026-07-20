@@ -28,6 +28,7 @@ a = Analysis(
     binaries=[],
     datas=[(str(customtkinter_path), 'customtkinter/')],
     hiddenimports=[
+        'neqsim',
         'CoolProp',
         'CoolProp.CoolProp',
         'CoolProp.State',
@@ -45,7 +46,6 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'neqsim',
         'CoolProp.tests',
         'CoolProp.Plots',
         'CoolProp.GUI',

@@ -35,7 +35,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install wheel setuptools
           pip install CoolProp numpy pydantic customtkinter matplotlib fpdf2 pyaga8 packaging
-          pip install pyinstaller
+          pip install neqsim
+          pip install pyinstaller pyinstaller-hooks-contrib
 
       - name: Build onedir (folder)
         shell: pwsh
