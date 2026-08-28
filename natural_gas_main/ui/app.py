@@ -84,6 +84,10 @@ class ThermoApp(ctk.CTk):
         
         self._check_queue()
         
+        # Optional silent update check on startup (opt-in via Help menu)
+        if preferences.get_preference("check_updates_on_startup", False):
+            self.after(2000, self._check_for_updates_silent)
+        
         # Show welcome message
         self.after(100, self._show_welcome)
 
@@ -96,6 +100,13 @@ class ThermoApp(ctk.CTk):
             "Programdan çıkmak istediğinize emin misiniz?\n"
             "Kaydedilmemiş değişiklikler kaybolacaktır."
         ):
+            # Unregister the log handler so the destroyed text widget is not
+            # scheduled again (prevents TclError / handler leak).
+            if hasattr(self, 'output_panel'):
+                try:
+                    self.output_panel.shutdown()
+                except Exception:
+                    pass
             self.quit()
     
     @staticmethod
@@ -182,6 +193,9 @@ class ThermoApp(ctk.CTk):
         help_menu.add_command(label="Kullanım Kılavuzu", command=dialogs.show_user_guide_dialog)
         help_menu.add_separator()
         help_menu.add_command(label="Güncellemeleri Denetle", command=self._check_for_updates_manual)
+        help_menu.add_command(label="Açılışta Sürüm Kontrolü (Aç/Kapat)", command=self._toggle_startup_update_check)
+        help_menu.add_separator()
+        help_menu.add_command(label="Mühendislik Sorumluluk Reddi", command=dialogs.show_engineering_disclaimer)
         help_menu.add_separator()
         help_menu.add_command(label="Hakkında", command=self._show_about)
 
@@ -475,6 +489,26 @@ class ThermoApp(ctk.CTk):
         else:
             self.status_var.set("Hesaplama tamamlandı.")
         
+        # Soft extrapolation warnings (do not block the result)
+        try:
+            extra_warnings = []
+            if inputs['temperature_k'] > config.EXTRAPOLATION_TEMP_K:
+                extra_warnings.append(
+                    f"Sıcaklık {inputs['temperature_k']:.0f} K endüstriyel doğal gaz "
+                    f"aralığının üzerinde (> {config.EXTRAPOLATION_TEMP_K:.0f} K). "
+                    "Sonuçlar ekstrapolasyon içerir."
+                )
+            if inputs['pressure_pa'] > config.EXTRAPOLATION_PRESS_PA:
+                extra_warnings.append(
+                    f"Basınç {inputs['pressure_pa'] / 1e5:.0f} bar AGA8 tanım aralığının "
+                    f"üzerinde (> {config.EXTRAPOLATION_PRESS_PA / 1e5:.0f} bar). "
+                    "Sonuçlar ekstrapolasyon içerir."
+                )
+            if extra_warnings:
+                dialogs.show_warning("Ekstrapolasyon Uyarısı", "\n".join(extra_warnings))
+        except Exception as e:
+            self.logger.debug(f"Extrapolation warning skipped: {e}")
+        
         # Re-enable UI
         self.calc_progress.stop()
         self.calc_progress.pack_forget()
@@ -545,7 +579,12 @@ class ThermoApp(ctk.CTk):
             # Ask for file path
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".pdf",
-                filetypes=[("PDF Dosyaları", "*.pdf"), ("Metin Dosyaları", "*.txt")],
+                filetypes=[
+                    ("PDF Dosyaları", "*.pdf"),
+                    ("Metin Dosyaları", "*.txt"),
+                    ("Excel Çalışma Kitabı", "*.xlsx"),
+                    ("CSV Dosyaları", "*.csv"),
+                ],
                 title="Raporu Kaydet"
             )
             
@@ -570,8 +609,20 @@ class ThermoApp(ctk.CTk):
             
             # Get results
             results = self.output_panel.get_results_as_list()
+            comparison_rows = self.output_panel.get_comparison_as_list()
             
-            if file_path.lower().endswith(".pdf"):
+            lower = file_path.lower()
+            if lower.endswith(".xlsx"):
+                ReportGenerator.export_excel(
+                    input_params, results, gas_composition,
+                    file_path, comparison_rows=comparison_rows
+                )
+            elif lower.endswith(".csv"):
+                ReportGenerator.export_csv(
+                    results, gas_composition, file_path,
+                    comparison_rows=comparison_rows
+                )
+            elif lower.endswith(".pdf"):
                 # Save plot to temp file
                 import tempfile
                 import os
@@ -589,7 +640,8 @@ class ThermoApp(ctk.CTk):
                     results,
                     gas_composition,
                     file_path,
-                    plot_image_path=plot_img
+                    plot_image_path=plot_img,
+                    comparison_results=comparison_rows
                 )
                 
                 # Cleanup temp file
@@ -692,6 +744,36 @@ class ThermoApp(ctk.CTk):
 
         threading.Thread(target=_check, daemon=True).start()
 
+    def _toggle_startup_update_check(self):
+        """Enable/disable the opt-in silent update check on startup."""
+        current = bool(preferences.get_preference("check_updates_on_startup", False))
+        preferences.set_preference("check_updates_on_startup", not current)
+        messagebox.showinfo(
+            "Güncelleme",
+            "Açılışta sürüm kontrolü etkinleştirildi."
+            if not current
+            else "Açılışta sürüm kontrolü kapatıldı."
+        )
+
+    def _check_for_updates_silent(self):
+        """Background update check that only updates the status bar."""
+        def _check():
+            try:
+                checker = UpdateChecker()
+                has_update, _, _ = checker.check_for_updates()
+                self.after(0, self._on_silent_update_result, has_update)
+            except Exception:
+                self.after(0, self._on_silent_update_result, False)
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _on_silent_update_result(self, has_update: bool) -> None:
+        """Handle the silent update check result on the main thread."""
+        if has_update:
+            self.status_var.set("✨ Yeni sürüm mevcut: Yardım > Güncellemeleri Denetle")
+        else:
+            self.status_var.set("Hazır.")
+
     def _on_update_check_result(self, has_update, update_info, status_msg):
         """Handle update check result on main thread."""
         self.configure(cursor="")
@@ -700,9 +782,11 @@ class ThermoApp(ctk.CTk):
                 f"✨ YENI SÜRÜM MEVCUT!\n\n"
                 f"Versiyon: {update_info.get('version')}\n"
                 f"Tarih: {update_info.get('date')}\n\n"
-                f"Değişiklikler:\n{update_info.get('changelog', '-')}\n\n"
-                f"İndirme sayfasına gitmek ister misiniz?"
+                f"Değişiklikler:\n{update_info.get('changelog', '-')}\n"
             )
+            if update_info.get('sha256'):
+                msg += f"\nSHA-256: {update_info['sha256']}\n"
+            msg += "\nİndirme sayfasına gitmek ister misiniz?"
             if messagebox.askyesno("Güncelleme Mevcut", msg):
                 UpdateChecker().open_download_page(update_info.get('download_url'))
             self.status_var.set("Hazır.")

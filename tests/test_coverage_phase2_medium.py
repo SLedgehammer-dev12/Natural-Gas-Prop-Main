@@ -238,9 +238,10 @@ class TestGasDataEdgeCases:
     def test_fraction_exactly_100(self):
         GasComponent(name="Methane", fraction=100.0)
 
-    def test_fraction_zero_invalid(self):
-        with pytest.raises(ValueError):
-            GasComponent(name="Methane", fraction=0.0)
+    def test_fraction_zero_allowed(self):
+        # 0.00% (undetected chromatograph gas) is a valid component
+        comp = GasComponent(name="Methane", fraction=0.0)
+        assert comp.fraction == 0.0
 
     def test_fraction_above_100_invalid(self):
         with pytest.raises(ValueError):

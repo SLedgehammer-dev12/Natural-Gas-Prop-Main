@@ -132,6 +132,14 @@ class OutputPanel(ctk.CTkFrame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.results_tree.pack(fill=tk.BOTH, expand=True)
         
+        # Right-click context menu: copy table to clipboard (TSV/Excel friendly)
+        self._results_menu = tk.Menu(self, tearoff=0)
+        self._results_menu.add_command(
+            label="Tabloyu Kopyala (TSV)",
+            command=self._copy_table_to_clipboard
+        )
+        self.results_tree.bind("<Button-3>", self._show_results_menu)
+        
         # Auto-resize columns on window resize
         results_tab.bind("<Configure>", lambda e: self._auto_resize_columns())
         
@@ -333,7 +341,11 @@ class OutputPanel(ctk.CTkFrame):
                         self.text_widget.configure(state=tk.DISABLED)
                 
                 # Schedule everything on main thread
-                self.text_widget.after(0, append)
+                try:
+                    self.text_widget.after(0, append)
+                except Exception:
+                    # Widget may already be destroyed while the app shuts down
+                    pass
         
         # Create and add handler
         self.text_handler = TextHandler(self.log_text, self.auto_scroll_var)
@@ -570,6 +582,48 @@ class OutputPanel(ctk.CTkFrame):
             values = self.results_tree.item(item)['values']
             results.append(tuple(values))
         return results
+
+    def get_comparison_as_list(self) -> List[List[str]]:
+        """
+        Get the Z-factor / property comparison matrix (header + rows).
+
+        Returns:
+            List of lists where the first row is the column header.
+        """
+        if not hasattr(self, 'comp_tree'):
+            return []
+        rows: List[List[str]] = []
+        columns = list(self.comp_tree["columns"])
+        rows.append([str(c) for c in columns])
+        for item in self.comp_tree.get_children():
+            rows.append([str(v) for v in self.comp_tree.item(item)['values']])
+        return rows
+
+    def _show_results_menu(self, event) -> None:
+        """Show the results-tree context menu at the pointer."""
+        try:
+            self._results_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._results_menu.grab_release()
+
+    def _copy_table_to_clipboard(self) -> None:
+        """Copy the results table to the clipboard as TSV (Excel-compatible)."""
+        lines = []
+        for item in self.results_tree.get_children():
+            values = self.results_tree.item(item)['values']
+            lines.append("\t".join(str(v) for v in values))
+        text = "\n".join(lines)
+        self.clipboard_clear()
+        self.clipboard_append(text)
+
+    def shutdown(self) -> None:
+        """Unregister the logging handler; call before the window is destroyed."""
+        import logging
+        root_logger = logging.getLogger()
+        try:
+            root_logger.removeHandler(self.text_handler)
+        except Exception:
+            pass
 
     def _auto_resize_columns(self):
         """Dynamically resize tree columns to fit available width."""

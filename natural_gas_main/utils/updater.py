@@ -46,10 +46,27 @@ class UpdateChecker:
                 if not remote_version:
                     return False, None, "Sürüm bilgisi okunamadı."
 
+                # Security: if a download asset is advertised, require/annotate
+                # its SHA-256 so corrupt or tampered files are detectable.
+                download_url = data.get("download_url")
+                asset_hash = data.get("sha256")
+                if download_url and not asset_hash:
+                    self.logger.warning(
+                        "Yeni sürüm için sha256 hash'i sağlanmamış; "
+                        "dosya bütünlüğü doğrulanamaz."
+                    )
+                if download_url and not self._validate_url(str(download_url)):
+                    self.logger.warning(
+                        f"download_url GitHub dışında; engellendi: {download_url}"
+                    )
+                    data["download_url"] = config.REPO_URL
+
                 if version.parse(remote_version) > version.parse(self.current_version):
                     self.logger.info(
                         f"New version found: {remote_version} (Current: {self.current_version})"
                     )
+                    if asset_hash:
+                        data["sha256"] = asset_hash
                     return True, data, None
 
                 self.logger.info("Application is up to date")

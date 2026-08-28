@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Dict
 
 from natural_gas_main.models.calculation_result import ActualConditionResults
@@ -48,6 +49,12 @@ AGA8_MAPPING: Dict[str, str] = {
     "carbondioxide": "carbon_dioxide",
     "nitrogen": "nitrogen",
 }
+
+# os.dup2 on stderr is process-global, so AGA8 engine calls that temporarily
+# redirect fd 2 (to hide Rust panic messages) must be serialized. Without this
+# lock, two concurrent AGA8 calculations (e.g. the parallel Z-factor
+# comparison) would corrupt each other's file descriptors.
+_AGA8_CALC_LOCK = threading.Lock()
 
 
 def calculate_aga8(
@@ -132,25 +139,28 @@ def calculate_aga8(
     engine.temperature = temperature_k
     engine.pressure = pressure_pa / 1000.0
 
-    # Redirect fd 2 to suppress Rust panic messages from pyaga8
-    old_fd = os.dup(2)
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(devnull_fd, 2)
-    os.close(devnull_fd)
-    try:
-        if method == "GERG-2008":
-            engine.calc_density(0)
-        else:
-            engine.calc_density()
-        engine.calc_properties()
-    except BaseException as e:
-        raise ValueError(
-            f"AGA8 {method} density calculation failed at "
-            f"T={temperature_k} K, P={pressure_pa} Pa: {e}"
-        ) from e
-    finally:
-        os.dup2(old_fd, 2)
-        os.close(old_fd)
+    # Redirect fd 2 to suppress Rust panic messages from pyaga8.
+    # os.dup2 is process-wide, so the whole block is guarded by a lock to keep
+    # other threads' error streams intact.
+    with _AGA8_CALC_LOCK:
+        old_fd = os.dup(2)
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, 2)
+        os.close(devnull_fd)
+        try:
+            if method == "GERG-2008":
+                engine.calc_density(0)
+            else:
+                engine.calc_density()
+            engine.calc_properties()
+        except Exception as e:
+            raise ValueError(
+                f"AGA8 {method} density calculation failed at "
+                f"T={temperature_k} K, P={pressure_pa} Pa: {e}"
+            ) from e
+        finally:
+            os.dup2(old_fd, 2)
+            os.close(old_fd)
 
     return ActualConditionResults(
         temperature=temperature_k,

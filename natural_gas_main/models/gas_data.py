@@ -4,7 +4,7 @@ Gas data models and mixture handling.
 Defines Pydantic models for gas components and mixtures with validation.
 """
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, computed_field
 import re
 import difflib
@@ -108,6 +108,33 @@ COOLPROP_NAME_MAP = {
     'r134a': 'R134a',
     'r22': 'R22',
     'r410a': 'R410A',
+    # Turkish common names (chromatography reports / clipboard paste)
+    'metan': 'Methane',
+    'etan': 'Ethane',
+    'propan': 'n-Propane',
+    'bütan': 'n-Butane',
+    'butan': 'n-Butane',
+    'izobütan': 'IsoButane',
+    'izobutan': 'IsoButane',
+    'pentan': 'n-Pentane',
+    'izopentan': 'Isopentane',
+    'neopentan': 'Neopentane',
+    'heksan': 'n-Hexane',
+    'heptan': 'n-Heptane',
+    'oktan': 'n-Octane',
+    'nonan': 'n-Nonane',
+    'dekan': 'n-Decane',
+    'azot': 'Nitrogen',
+    'karbondioksit': 'CarbonDioxide',
+    'hidrojensülfür': 'HydrogenSulfide',
+    'hidrojen': 'Hydrogen',
+    'oksijen': 'Oxygen',
+    'helyum': 'Helium',
+    'argon': 'Argon',
+    'karbonmonoksit': 'CarbonMonoxide',
+    'su': 'Water',
+    'etilen': 'Ethylene',
+    'propilen': 'Propylene',
 }
 
 
@@ -121,7 +148,7 @@ class GasComponent(BaseModel):
     """
     
     name: str = Field(..., min_length=1, description="Gas component name")
-    fraction: float = Field(..., gt=0, le=100, description="Fraction percentage (0-100)")
+    fraction: float = Field(..., ge=0, le=100, description="Fraction percentage (0-100)")
     
     @field_validator('name')
     @classmethod
@@ -135,8 +162,8 @@ class GasComponent(BaseModel):
     @field_validator('fraction')
     @classmethod
     def validate_fraction(cls, v: float) -> float:
-        """Validate fraction is in valid range."""
-        if v <= 0 or v > 100:
+        """Validate fraction is in valid range (0% allowed, negative rejected)."""
+        if v < 0 or v > 100:
             raise ValueError(f"Fraction must be between 0 and 100, got {v}")
         return v
     
@@ -226,12 +253,20 @@ class GasMixture(BaseModel):
         return GasMixture(components=normalized, fraction_type=self.fraction_type)
     
     def get_decimal_fractions(self) -> List[float]:
-        """Get fractions as decimal values (0-1 range)."""
-        return [comp.to_decimal() for comp in self.components]
+        """Get fractions as decimal values (0-1 range), excluding zero-fraction components."""
+        return [comp.to_decimal() for comp in self.effective_components()]
     
     def get_gas_names(self) -> List[str]:
         """Get list of gas names."""
         return [comp.name for comp in self.components]
+    
+    def effective_components(self) -> List[GasComponent]:
+        """Return components with a positive fraction.
+
+        0.00% components (e.g. trace gases not detected by the chromatograph)
+        are filtered out so they do not reach CoolProp/AGA8 state construction.
+        """
+        return [comp for comp in self.components if comp.fraction > 0]
     
     def to_coolprop_string(self) -> str:
         """
@@ -246,7 +281,7 @@ class GasMixture(BaseModel):
         """
         formatted_names = [
             self._format_gas_name_for_coolprop(comp.name)
-            for comp in self.components
+            for comp in self.effective_components()
         ]
         return '&'.join(formatted_names)
     
@@ -263,6 +298,17 @@ class GasMixture(BaseModel):
         """
         clean_name = re.sub(r'\s+', '', gas_name.strip()).lower()
         return COOLPROP_NAME_MAP.get(clean_name, GasMixture._fuzzy_match_gas_name(clean_name))
+
+    @staticmethod
+    def _exact_coolprop_name(gas_name: str) -> "Optional[str]":
+        """Return the CoolProp name only for an exact alias match.
+
+        Unlike ``_format_gas_name_for_coolprop`` this does NOT apply fuzzy
+        matching, so arbitrary tokens (e.g. from a clipboard paste) are not
+        silently converted into a bogus gas name.
+        """
+        clean_name = re.sub(r'\s+', '', gas_name.strip()).lower()
+        return COOLPROP_NAME_MAP.get(clean_name)
 
     @staticmethod
     def _fuzzy_match_gas_name(clean_name: str) -> str:
@@ -296,7 +342,7 @@ class GasMixture(BaseModel):
         """
         heos_compatible = [g.lower() for g in config.HEOS_COMPATIBLE_GASES]
         incompatible = [
-            comp.name for comp in self.components
+            comp.name for comp in self.effective_components()
             if self._format_gas_name_for_coolprop(comp.name).lower() not in heos_compatible
         ]
         return incompatible

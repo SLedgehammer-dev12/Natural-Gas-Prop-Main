@@ -115,30 +115,55 @@ def load_inputs_from_file(filepath: str) -> Dict[str, Any]:
 
 def validate_loaded_data(data: Dict[str, Any]) -> bool:
     """
-    Validate that loaded data has required fields.
-    
+    Validate that loaded data has required fields and passes GasMixture
+    Pydantic validation (component count, duplicate names, fraction ranges).
+
     Args:
         data: Loaded data dictionary
         
     Returns:
         True if data is valid, False otherwise
     """
-    required_fields = ["composition"]
-    
-    for field in required_fields:
-        if field not in data:
-            logger.warning(f"Missing required field: {field}")
+    try:
+        from natural_gas_main.models.gas_data import GasMixture, GasComponent
+
+        required_fields = ["composition"]
+        for field in required_fields:
+            if field not in data:
+                logger.warning(f"Missing required field: {field}")
+                return False
+
+        # Validate composition structure
+        composition = data.get("composition", [])
+        if not isinstance(composition, list):
             return False
-    
-    # Validate composition structure
-    composition = data.get("composition", [])
-    if not isinstance(composition, list):
+        if not composition:
+            logger.warning("Composition list is empty")
+            return False
+
+        components = []
+        for comp in composition:
+            if not isinstance(comp, dict):
+                return False
+            if "name" not in comp or "fraction" not in comp:
+                return False
+            name = comp.get("name")
+            fraction = comp.get("fraction")
+            if not isinstance(name, str) or not name.strip():
+                return False
+            # Reject bools and non-numeric types
+            if isinstance(fraction, bool) or not isinstance(fraction, (int, float)):
+                return False
+            components.append(GasComponent(name=name, fraction=fraction))
+
+        fraction_type = data.get("fraction_type", "molar")
+        if fraction_type not in ("molar", "mass"):
+            return False
+
+        # Run the full Pydantic GasMixture validation (count, duplicates, ranges)
+        GasMixture(components=components, fraction_type=fraction_type)
+        return True
+
+    except Exception as e:
+        logger.warning(f"Loaded data validation failed: {e}")
         return False
-    
-    for comp in composition:
-        if not isinstance(comp, dict):
-            return False
-        if "name" not in comp or "fraction" not in comp:
-            return False
-    
-    return True

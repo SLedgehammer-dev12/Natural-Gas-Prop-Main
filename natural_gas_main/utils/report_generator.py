@@ -10,6 +10,7 @@ from pathlib import Path
 import logging
 import os
 import tempfile
+from natural_gas_main.config.settings import config
 class ReportGenerator:
     """Generates formatted text reports from calculation results."""
 
@@ -30,6 +31,23 @@ class ReportGenerator:
             bold = font_manager.findfont("DejaVu Sans:style=normal:weight=bold", fallback_to_default=False)
             italic = font_manager.findfont("DejaVu Sans:style=oblique", fallback_to_default=False)
             font_sets.append(("DejaVu", regular, bold, italic))
+        except Exception:
+            pass
+
+        # Bundled DejaVu fonts shipped inside the matplotlib package: these are
+        # always present when matplotlib is installed (it is a hard dependency
+        # of the UI), so the report does not depend on OS font paths.
+        try:
+            import matplotlib
+            bundled_dir = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
+            bundled_regular = os.path.join(bundled_dir, "DejaVuSans.ttf")
+            if os.path.exists(bundled_regular):
+                font_sets.append((
+                    "DejaVu",
+                    bundled_regular,
+                    os.path.join(bundled_dir, "DejaVuSans-Bold.ttf"),
+                    os.path.join(bundled_dir, "DejaVuSans-Oblique.ttf"),
+                ))
         except Exception:
             pass
 
@@ -108,7 +126,8 @@ class ReportGenerator:
         results: List[Tuple[str, str, str]],
         gas_composition: List[Tuple[str, float]],
         log_file: Optional[str] = None,
-        include_full_log: bool = False
+        include_full_log: bool = False,
+        comparison_results: Optional[List[List[str]]] = None
     ) -> str:
         """
         Generate formatted text report with timestamped log.
@@ -182,6 +201,16 @@ class ReportGenerator:
         
         report_lines.append("")
         
+        # Model comparison matrix
+        if comparison_results and len(comparison_results) > 1:
+            report_lines.append("╔" + "═" * 88 + "╗")
+            report_lines.append("║" + " MODEL KARŞILAŞTIRMA MATRİSİ".center(88) + "║")
+            report_lines.append("╚" + "═" * 88 + "╝")
+            report_lines.append("")
+            for row in comparison_results:
+                report_lines.append("  " + "  |  ".join(str(c) for c in row))
+            report_lines.append("")
+        
         # Calculation Log Section
         report_lines.append("╔" + "═" * 88 + "╗")
         report_lines.append("║" + " HESAPLAMA LOG KAYDI (TIMESTAMP'Lİ)".center(88) + "║")
@@ -200,6 +229,15 @@ class ReportGenerator:
         
         report_lines.append("")
         
+        # Engineering disclaimer
+        report_lines.append("╔" + "═" * 88 + "╗")
+        report_lines.append("║" + " MÜHENDİSLİK SORUMLULUK REDDİ".center(88) + "║")
+        report_lines.append("╚" + "═" * 88 + "╝")
+        report_lines.append("")
+        for line in ReportGenerator._wrap_text(config.ENGINEERING_DISCLAIMER, 84):
+            report_lines.append("  " + line)
+        report_lines.append("")
+        
         # Footer
         report_lines.append("=" * 90)
         report_lines.append(f"  Rapor Oluşturma Zamanı: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -208,6 +246,23 @@ class ReportGenerator:
         
         return "\n".join(report_lines)
     
+    @staticmethod
+    def _wrap_text(text: str, width: int) -> List[str]:
+        """Word-wrap a long paragraph into lines of at most `width` chars."""
+        words = text.split()
+        lines: List[str] = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + 1 > width:
+                if current:
+                    lines.append(current)
+                current = word
+            else:
+                current = f"{current} {word}".strip()
+        if current:
+            lines.append(current)
+        return lines
+
     @staticmethod
     def _get_calculation_log(log_file: Optional[str], include_full: bool = False) -> List[str]:
         """
@@ -273,7 +328,8 @@ class ReportGenerator:
         results: List[Tuple[str, str, str]],
         gas_composition: List[Tuple[str, float]],
         file_path: str,
-        plot_image_path: Optional[str] = None
+        plot_image_path: Optional[str] = None,
+        comparison_results: Optional[List[List[str]]] = None
     ) -> None:
         """
         Generate professional PDF report using fpdf2.
@@ -284,6 +340,7 @@ class ReportGenerator:
             gas_composition: List of (gas_name, fraction) tuples
             file_path: Output PDF path
             plot_image_path: Optional path to phase envelope plot image
+            comparison_results: Optional comparison matrix (header row first)
         """
         from fpdf import FPDF  # lazy import to avoid numpy dependency at startup
 
@@ -379,6 +436,45 @@ class ReportGenerator:
                 pdf.cell(50, 7, value, border=1, align='C')
                 pdf.cell(0, 7, unit, border=1, new_x="LMARGIN", new_y="NEXT", align='C')
         
+        # Section 4: Model comparison matrix
+        if comparison_results and len(comparison_results) > 1:
+            if pdf.get_y() > 190:
+                pdf.add_page()
+            pdf.set_font(font_family, "B", 12)
+            pdf.set_text_color(31, 83, 141)
+            pdf.cell(0, 10, "4. MODEL KARŞILAŞTIRMA MATRİSİ", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font(font_family, "B", 8)
+            # header
+            header = comparison_results[0]
+            col_w = 150.0 / max(len(header), 1)
+            for idx, h in enumerate(header):
+                last = idx == len(header) - 1
+                pdf.cell(col_w, 7, f" {h}", border=1, fill=True,
+                         new_x="LMARGIN" if last else "RIGHT",
+                         new_y="NEXT" if last else "LAST")
+            pdf.set_font(font_family, "", 8)
+            for row in comparison_results[1:]:
+                for idx, val in enumerate(row):
+                    last = idx == len(row) - 1
+                    pdf.cell(col_w, 6, f" {val}", border=1,
+                             new_x="LMARGIN" if last else "RIGHT",
+                             new_y="NEXT" if last else "LAST")
+                if pdf.get_y() > 265:
+                    pdf.add_page()
+                    pdf.set_font(font_family, "", 8)
+
+        # Engineering disclaimer section
+        if pdf.get_y() > 200:
+            pdf.add_page()
+        pdf.set_font(font_family, "B", 11)
+        pdf.set_text_color(178, 34, 34)
+        pdf.cell(0, 9, "MÜHENDİSLİK SORUMLULUK REDDİ", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(80, 80, 80)
+        pdf.set_font(font_family, "", 8)
+        for line in ReportGenerator._wrap_text(config.ENGINEERING_DISCLAIMER, 95):
+            pdf.cell(0, 4.5, line, new_x="LMARGIN", new_y="NEXT")
+        
         # Footer
         pdf.set_y(-20)
         pdf.set_font(font_family, "I", 8)
@@ -389,6 +485,127 @@ class ReportGenerator:
         
         pdf.output(file_path)
     
+    @staticmethod
+    def export_csv(
+        results: List[Tuple[str, str, str]],
+        gas_composition: List[Tuple[str, float]],
+        file_path: str,
+        comparison_results: Optional[List[List[str]]] = None
+    ) -> None:
+        """
+        Export results to a UTF-8 (BOM) CSV file that opens correctly in Excel.
+
+        Args:
+            results: List of (property, value, unit) tuples
+            gas_composition: List of (gas_name, fraction) tuples
+            file_path: Output CSV path
+            comparison_results: Optional comparison matrix
+        """
+        import csv as _csv
+
+        with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = _csv.writer(f, delimiter=';')
+            writer.writerow(["Gaz Kompozisyonu", "Oran (%)"])
+            for gas, frac in gas_composition:
+                writer.writerow([gas, f"{frac:.6f}"])
+            writer.writerow([])
+            writer.writerow(["Özellik", "Değer", "Birim"])
+            for prop, value, unit in results:
+                writer.writerow([prop, value, unit])
+            if comparison_results and len(comparison_results) > 1:
+                writer.writerow([])
+                writer.writerow(["MODEL KARŞILAŞTIRMA MATRİSİ"])
+                for row in comparison_results:
+                    writer.writerow([str(c) for c in row])
+
+    @staticmethod
+    def export_excel(
+        input_params: Dict[str, Any],
+        results: List[Tuple[str, str, str]],
+        gas_composition: List[Tuple[str, float]],
+        file_path: str,
+        comparison_results: Optional[List[List[str]]] = None
+    ) -> None:
+        """
+        Export results to a formatted Excel (.xlsx) workbook using openpyxl.
+
+        Args:
+            input_params: Dictionary with calculation inputs
+            results: List of (property, value, unit) tuples
+            gas_composition: List of (gas_name, fraction) tuples
+            file_path: Output XLSX path
+            comparison_results: Optional comparison matrix
+        """
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment
+        except ImportError as e:
+            raise ImportError(
+                "Excel (.xlsx) dışa aktarımı için 'openpyxl' paketi gerekli: "
+                "pip install openpyxl"
+            ) from e
+
+        wb = Workbook()
+
+        # Sheet 1: Results
+        ws = wb.active
+        ws.title = "Sonuçlar"
+        header_font = Font(bold=True)
+        header_fill = PatternFill(start_color="1F538D", end_color="1F538D", fill_type="solid")
+        header_font_white = Font(bold=True, color="FFFFFF")
+
+        ws.append(["GİRİLEN PARAMETRELER"])
+        for key, label in [("temperature", "Sıcaklık"), ("pressure", "Basınç"),
+                           ("backend", "Hesaplama Yöntemi"), ("fraction_type", "Kompozisyon Tipi")]:
+            if key in input_params:
+                ws.append([label, input_params[key]])
+        if input_params.get("volume"):
+            ws.append(["Hacim (ACM)", input_params["volume"]])
+        ws.append([])
+
+        ws.append(["GAZ KOMPOZİSYONU"])
+        ws.append(["Bileşen", "Oran (%)"])
+        for cell in ws[ws.max_row]:
+            cell.font = header_font_white
+            cell.fill = header_fill
+        for gas, frac in gas_composition:
+            ws.append([gas, round(frac, 6)])
+        ws.append([])
+
+        ws.append(["ÖZELLİK", "DEĞER", "BİRİM"])
+        for cell in ws[ws.max_row]:
+            cell.font = header_font_white
+            cell.fill = header_fill
+        for prop, value, unit in results:
+            ws.append([prop, value, unit])
+
+        for col_cells in ws.columns:
+            max_len = max((len(str(c.value)) for c in col_cells if c.value is not None), default=8)
+            ws.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 60)
+
+        # Sheet 2: Comparison matrix
+        if comparison_results and len(comparison_results) > 1:
+            ws2 = wb.create_sheet("Karşılaştırma")
+            for row in comparison_results:
+                ws2.append([str(c) for c in row])
+            for cell in ws2[1]:
+                cell.font = header_font_white
+                cell.fill = header_fill
+            for col_cells in ws2.columns:
+                max_len = max((len(str(c.value)) for c in col_cells if c.value is not None), default=8)
+                ws2.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 60)
+
+        # Sheet 3: Disclaimer
+        ws3 = wb.create_sheet("Sorumluluk Reddi")
+        ws3["A1"] = "MÜHENDİSLİK SORUMLULUK REDDİ"
+        ws3["A1"].font = Font(bold=True, color="B22222")
+        ws3["A2"] = config.ENGINEERING_DISCLAIMER
+        ws3["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+        ws3.column_dimensions["A"].width = 100
+        ws3.row_dimensions[2].height = 120
+
+        wb.save(file_path)
+
     @staticmethod
     def save_to_file(report_content: str, file_path: str) -> None:
         """

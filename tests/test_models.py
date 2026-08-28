@@ -18,9 +18,11 @@ class TestGasComponent:
         with pytest.raises(ValueError):
             GasComponent(name="Test", fraction=-1.0)
 
-    def test_fraction_zero_raises(self):
-        with pytest.raises(ValueError):
-            GasComponent(name="Test", fraction=0.0)
+    def test_fraction_zero_allowed(self):
+        # 0.00% (undetected chromatograph gas) is a valid component
+        comp = GasComponent(name="Test", fraction=0.0)
+        assert comp.fraction == 0.0
+        assert comp.to_decimal() == 0.0
 
     def test_empty_name_raises(self):
         with pytest.raises(ValueError):

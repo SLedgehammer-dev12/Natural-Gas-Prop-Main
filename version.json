@@ -1,7 +1,8 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.7.3",
-  "date": "2026-07-20",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.7.3",
-  "changelog": "- Backend-gaz uyumluluk gostergeleri: Yesil/Kirmizi simge, turuncu uyari etiketi.\n- Dinamik gaz listesi: 'Yalnizca Yontem Gazlari' toggle ile backend filtreleme.\n- Backend-gas uyumluluk API'si: check_gas_backend_support() ve get_unsupported_gases_for_backend().\n- Duzeltme: Cifte 'Non-AGA8 bilesenler' logu kaldirildi.\n- Duzeltme: Preferred backend GERG-2008/AGA8-Detail non-AGA8 karisimda listeden cikariliyor.\n- Duzeltme: Z-factor karsilastirmasinda non-AGA8 karisimlarda AGA8 atlaniyor."
+  "version": "v1.8.0",
+  "date": "2026-08-28",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.8.0",
+  "sha256": "",
+  "changelog": "- Dogruluk: Standart basinc birim hatasi duzeltildi (101.325 kPa).\n- Wichert-Aziz asit gaz duzeltmesi H2S/CO2 ve Turkce isimlerle de calisiyor.\n- DAK cozucusu Newton-Raphson + damping (kritik bolgede kararli yakinlasma).\n- Hidrat modelleri SG/basinc gecerlilik araliklariyla filtreleniyor.\n- NCM (normal hacim) fallback zinciri [secili, SRK, PR, HEOS].\n- Turkce virgul (,) giris destegi (sicaklik/basinc/hacim).\n- %0.00 bilesenler kromatograf sablonlarinda sorun cikarmiyor.\n- .ngp sema dogrulamasi Pydantic GasMixture ile guclendirildi.\n- UX: '100%e Normallestir', 'Panodan Yapistir', ozel sablon yonetimi,\n  molar-kutle otomatik donusum, cift-tik/Enter kisayollari.\n- Rapor: Excel (.xlsx) ve CSV disa aktarma, panoya kopyalama,\n  PDF'e model karsilastirma matrisi.\n- Z-karsilastirma matrisi paralellestirildi (NeqSim seri kalir).\n- Engineering disclaimer tum raporlara eklendi.\n- 672 test, %94 coverage."
 }

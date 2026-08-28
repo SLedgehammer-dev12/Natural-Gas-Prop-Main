@@ -87,7 +87,7 @@ class TestNeqSimGasMapping:
         assert NEQSIM_GAS_MAPPING["carbondioxide"] == "CO2"
         assert NEQSIM_GAS_MAPPING["hydrogensulfide"] == "H2S"
         assert NEQSIM_GAS_MAPPING["n-butane"] == "n-butane"
-        assert NEQSIM_GAS_MAPPING["isobutane"] == "isobutane"
+        assert NEQSIM_GAS_MAPPING["isobutane"] == "i-butane"
 
     def test_water_and_glycols_mapped(self):
         """Test water, MEG, TEG are mapped."""

@@ -142,7 +142,19 @@ class InputPanel(ctk.CTkFrame):
             left_frame,
             text="Ekle >>",
             command=self._on_add_gas
-        ).pack(fill=tk.X, pady=5)
+        ).pack(fill=tk.X, pady=(5, 2))
+        
+        # Paste gas composition from clipboard (Excel / chromatograph)
+        ctk.CTkButton(
+            left_frame,
+            text="Panodan Yapıştır",
+            command=self._on_paste_from_clipboard,
+            fg_color="#37474F",
+            hover_color="#263238"
+        ).pack(fill=tk.X, pady=2)
+        
+        # Double-click a gas name to add it
+        self.gas_listbox.bind("<Double-Button-1>", lambda e: self._on_add_gas())
         
         # Right Panel: Selected Composition (Inline Editing)
         right_frame = ctk.CTkFrame(paned, fg_color="transparent")
@@ -168,7 +180,7 @@ class InputPanel(ctk.CTkFrame):
         ctk.CTkLabel(btn_frame, text="Şablon:").pack(side=tk.LEFT, padx=(0, 5))
         
         self.preset_var = tk.StringVar(value="Seçiniz...")
-        preset_combo = ctk.CTkComboBox(
+        self.preset_combo = ctk.CTkComboBox(
             btn_frame, 
             variable=self.preset_var,
             values=["Seçiniz...", "Tipik Doğal Gaz", "BOTAŞ Standardı", "Zengin Gaz (LNG)"],
@@ -176,7 +188,25 @@ class InputPanel(ctk.CTkFrame):
             command=self._on_preset_selected,
             width=135
         )
-        preset_combo.pack(side=tk.LEFT)
+        self.preset_combo.pack(side=tk.LEFT)
+        
+        # Custom preset manager (save / delete user templates)
+        ctk.CTkButton(
+            btn_frame,
+            text="Şablon Kaydet",
+            command=self._on_save_custom_preset,
+            width=90,
+            font=ctk.CTkFont(size=11)
+        ).pack(side=tk.LEFT, padx=(5, 0))
+        ctk.CTkButton(
+            btn_frame,
+            text="Şablon Sil",
+            command=self._on_delete_custom_preset,
+            width=80,
+            fg_color="#455A64",
+            hover_color="#37474F",
+            font=ctk.CTkFont(size=11)
+        ).pack(side=tk.LEFT, padx=(2, 0))
         
         ctk.CTkButton(
             btn_frame,
@@ -186,6 +216,17 @@ class InputPanel(ctk.CTkFrame):
             hover_color="#D32F2F",
             width=60
         ).pack(side=tk.RIGHT)
+        
+        # Auto-normalize to exactly 100%
+        ctk.CTkButton(
+            btn_frame,
+            text="100%'e Normalleştir",
+            command=self._on_normalize_fractions,
+            fg_color="#1565C0",
+            hover_color="#0D47A1",
+            width=130,
+            font=ctk.CTkFont(size=11)
+        ).pack(side=tk.RIGHT, padx=(0, 5))
         
         # Total label
         self.total_label = ctk.CTkLabel(
@@ -206,14 +247,16 @@ class InputPanel(ctk.CTkFrame):
             type_frame,
             text="Molar %",
             variable=self.fraction_type_var,
-            value="molar"
+            value="molar",
+            command=self._on_fraction_type_change
         ).pack(side=tk.LEFT, padx=10)
         
         ctk.CTkRadioButton(
             type_frame,
             text="Kütlesel %",
             variable=self.fraction_type_var,
-            value="mass"
+            value="mass",
+            command=self._on_fraction_type_change
         ).pack(side=tk.LEFT)
         
         # Third Panel: Pie Chart
@@ -454,7 +497,7 @@ class InputPanel(ctk.CTkFrame):
         current_total = 0.0
         for row in self.comp_rows.values():
             try:
-                current_total += float(row['var'].get())
+                current_total += float(row['var'].get().replace(',', '.'))
             except ValueError:
                 pass
         remaining = max(0.0, 100.0 - current_total)
@@ -482,6 +525,8 @@ class InputPanel(ctk.CTkFrame):
         
         entry = ctk.CTkEntry(row_frame, textvariable=var, width=80)
         entry.pack(side=tk.LEFT, padx=(0, 5))
+        # Enter moves focus to the next fraction row
+        entry.bind("<Return>", lambda e, g=gas_name: self._on_fraction_enter(g))
         
         # Remove button
         def remove_row():
@@ -517,8 +562,17 @@ class InputPanel(ctk.CTkFrame):
         self._update_backend_compatibility()
         
     def _on_preset_selected(self, choice):
-        """Auto-fill gas composition based on selected preset."""
+        """Auto-fill gas composition based on selected preset (built-in or custom)."""
         if choice == "Seçiniz...":
+            return
+            
+        custom = self._get_custom_presets()
+        if choice in custom:
+            self._on_clear_all()
+            for gas, val in custom[choice].items():
+                self._add_gas_row(gas, f"{val:.6f}")
+            self._update_total_label()
+            self.preset_var.set("Seçiniz...")
             return
             
         presets = {
@@ -535,13 +589,244 @@ class InputPanel(ctk.CTkFrame):
             self._update_total_label()
             
         self.preset_var.set("Seçiniz...")
+    
+    # --- Custom preset management -----------------------------------------
+
+    PRESET_PREFS_KEY = "custom_presets"
+
+    def _get_custom_presets(self) -> dict:
+        """Return the user's saved composition templates."""
+        from natural_gas_main.config import preferences
+        presets = preferences.get_preference(self.PRESET_PREFS_KEY, {})
+        return presets if isinstance(presets, dict) else {}
+
+    def _refresh_preset_combo(self) -> None:
+        """Reload the preset dropdown including custom templates."""
+        values = ["Seçiniz...", "Tipik Doğal Gaz", "BOTAŞ Standardı", "Zengin Gaz (LNG)"]
+        values += sorted(self._get_custom_presets().keys())
+        self.preset_combo.configure(values=values)
+        self.preset_var.set("Seçiniz...")
+
+    def _on_save_custom_preset(self) -> None:
+        """Save the current composition as a named, reusable template."""
+        import tkinter.simpledialog as sd
+        from natural_gas_main.ui.dialogs import show_warning, show_info
+        from natural_gas_main.config import preferences
+
+        name = sd.askstring("Şablon Kaydet", "Şablon adı:", parent=self)
+        if not name or not name.strip():
+            return
+        name = name.strip()
+
+        comp = {}
+        for gas_name, row in self.comp_rows.items():
+            try:
+                comp[gas_name] = float(row['var'].get().replace(',', '.') or 0)
+            except ValueError:
+                comp[gas_name] = 0.0
+        if not comp:
+            show_warning("Şablon", "Kaydedilecek gaz bileşeni yok.")
+            return
+
+        presets = self._get_custom_presets()
+        presets[name] = comp
+        preferences.set_preference(self.PRESET_PREFS_KEY, presets)
+        self._refresh_preset_combo()
+        show_info("Şablon", f"'{name}' şablonu kaydedildi.")
+
+    def _on_delete_custom_preset(self) -> None:
+        """Delete the currently selected custom template."""
+        from natural_gas_main.config import preferences
+        from natural_gas_main.ui.dialogs import show_warning, show_info
+
+        presets = self._get_custom_presets()
+        if not presets:
+            show_warning("Şablon", "Kayıtlı özel şablon yok.")
+            return
+        name = self.preset_var.get()
+        if name in presets:
+            del presets[name]
+            preferences.set_preference(self.PRESET_PREFS_KEY, presets)
+            self._refresh_preset_combo()
+            show_info("Şablon", f"'{name}' şablonu silindi.")
+        else:
+            show_warning("Şablon", "Lütfen açılır menüden silinecek özel şablonu seçin.")
+
+    # --- Composition ergonomics -------------------------------------------
+
+    def _on_normalize_fractions(self) -> None:
+        """Scale all fractions so the total is exactly 100%."""
+        from natural_gas_main.ui.dialogs import show_warning, show_info
+
+        components = []
+        for gas_name, row in self.comp_rows.items():
+            try:
+                frac = float(row['var'].get().replace(',', '.') or 0)
+            except ValueError:
+                frac = 0.0
+            components.append(GasComponent(name=gas_name, fraction=max(frac, 0.0)))
+        if not components:
+            return
+
+        try:
+            mixture = GasMixture(
+                components=components,
+                fraction_type=self.fraction_type_var.get()
+            )
+            normalized = mixture.normalize_fractions()
+        except Exception as e:
+            show_warning("Normalleştirme", f"Normalleştirme yapılamadı: {e}")
+            return
+
+        for comp in normalized.components:
+            if comp.name in self.comp_rows:
+                self.comp_rows[comp.name]['var'].set(f"{comp.fraction:.6f}")
+        self._update_total_label()
+        show_info("Normalleştirme", "Tüm oranlar toplamı %100 olacak şekilde ölçeklendi.")
+
+    def _on_paste_from_clipboard(self) -> None:
+        """Parse gas composition pasted from Excel / chromatograph clipboard."""
+        from natural_gas_main.ui.dialogs import show_warning, show_info
+
+        try:
+            text = self.clipboard_get()
+        except Exception:
+            show_warning("Pano", "Panoda metin bulunamadı.")
+            return
+
+        parsed = self._parse_composition_text(text)
+        if not parsed:
+            show_warning(
+                "Pano",
+                "Panodan gaz bileşeni ayrıştırılamadı.\n"
+                "Örn. 'Metan 92.5' veya 'CO2\\t0.5' biçimlerini kullanın."
+            )
+            return
+
+        added = 0
+        updated = 0
+        for name, frac in parsed:
+            if name in self.comp_rows:
+                self.comp_rows[name]['var'].set(f"{frac:.6f}")
+                updated += 1
+            else:
+                self._add_gas_row(name, f"{frac:.6f}")
+                added += 1
+        self._update_total_label()
+        show_info("Pano", f"{added} gaz eklendi, {updated} gaz güncellendi.")
+
+    def _parse_composition_text(self, text: str) -> List[Tuple[str, float]]:
+        """Parse 'Name number' / 'CO2<TAB>0.5' lines into (CoolProp_name, percent)."""
+        import re as _re
+        from natural_gas_main.models.gas_data import COOLPROP_NAME_MAP
+
+        result = []
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            tokens = [t for t in _re.split(r'[\t,;:]|\s+', line) if t]
+            i = 0
+            while i < len(tokens):
+                tok = tokens[i]
+                cleaned = tok.replace(',', '.').replace('%', '')
+                try:
+                    number = float(cleaned)
+                    # Number followed by name: "92.5 Metan"
+                    if i + 1 < len(tokens):
+                        name_tok = tokens[i + 1]
+                        cp_name = GasMixture._exact_coolprop_name(name_tok)
+                        if cp_name is not None:
+                            result.append((cp_name, number))
+                            i += 2
+                            continue
+                    i += 1
+                except ValueError:
+                    # Name followed by number: "Metan 92.5"
+                    if i + 1 < len(tokens):
+                        num_tok = tokens[i + 1].replace(',', '.').replace('%', '')
+                        try:
+                            number = float(num_tok)
+                        except ValueError:
+                            i += 1
+                            continue
+                        cp_name = GasMixture._exact_coolprop_name(tok)
+                        if cp_name is not None and 0 <= number <= 100:
+                            result.append((cp_name, number))
+                        i += 2
+                        continue
+                    i += 1
+        return result
+
+    def _on_fraction_enter(self, current_name: str) -> None:
+        """Move focus to the next fraction entry on Enter."""
+        names = list(self.comp_rows.keys())
+        try:
+            idx = names.index(current_name)
+        except ValueError:
+            return
+        if idx + 1 < len(names):
+            self.comp_rows[names[idx + 1]]['entry'].focus_set()
+
+    def _on_fraction_type_change(self) -> None:
+        """Convert existing fractions when switching between molar and mass basis."""
+        from natural_gas_main.ui.dialogs import show_warning
+
+        target = self.fraction_type_var.get()
+        rows = {}
+        for gas_name, row in self.comp_rows.items():
+            try:
+                rows[gas_name] = float(row['var'].get().replace(',', '.') or 0)
+            except ValueError:
+                rows[gas_name] = 0.0
+        if not rows or all(v == 0 for v in rows.values()):
+            return
+
+        try:
+            import CoolProp.CoolProp as CP
+            molar_masses = {}
+            for name in rows:
+                cp_name = GasMixture._format_gas_name_for_coolprop(name)
+                molar_masses[name] = CP.PropsSI("M", cp_name)
+        except Exception as e:
+            self.logger.warning(f"Fraction conversion failed: {e}")
+            prev = "mass" if target == "molar" else "molar"
+            self.fraction_type_var.set(prev)
+            show_warning(
+                "Oran Dönüşümü",
+                "Molar/kütlesel dönüşüm yapılamadı (CoolProp hatası). "
+                "Değerler korundu."
+            )
+            return
+
+        total_basis = 0.0
+        converted = {}
+        for name, frac in rows.items():
+            if target == "mass":
+                # molar % -> mass %
+                converted[name] = frac * molar_masses[name]
+            else:
+                # mass % -> molar %
+                converted[name] = frac / molar_masses[name]
+            total_basis += converted[name]
+
+        if total_basis <= 0:
+            return
+
+        # Preserve the original total instead of silently normalizing
+        original_total = sum(rows.values())
+        for name, value in converted.items():
+            self.comp_rows[name]['var'].set(
+                f"{value / total_basis * original_total:.6f}"
+            )
+        self._update_total_label()
         
     def _update_total_label(self):
         """Update total composition label."""
         total = 0.0
         for gas_name, row in self.comp_rows.items():
             try:
-                val = float(row['var'].get() or 0)
+                val = float((row['var'].get() or '0').replace(',', '.'))
                 total += val
             except ValueError:
                 pass
@@ -708,7 +993,7 @@ class InputPanel(ctk.CTkFrame):
             ValidationError: If temperature is invalid
         """
         try:
-            val = float(self.temp_var.get())
+            val = float(self.temp_var.get().replace(',', '.'))
             unit = self.temp_unit_var.get()
             return converters.convert_temperature_to_K(val, unit)
         except Exception as e:
@@ -726,7 +1011,7 @@ class InputPanel(ctk.CTkFrame):
             ValidationError: If pressure is invalid
         """
         try:
-            val = float(self.press_var.get())
+            val = float(self.press_var.get().replace(',', '.'))
             unit = self.press_unit_var.get()
             return converters.convert_pressure_to_Pa(val, unit)
         except Exception as e:
@@ -750,7 +1035,7 @@ class InputPanel(ctk.CTkFrame):
             return None
             
         try:
-            val = float(vol_str)
+            val = float(vol_str.replace(',', '.'))
             unit = self.vol_unit_var.get()
             
             # Convert to m3

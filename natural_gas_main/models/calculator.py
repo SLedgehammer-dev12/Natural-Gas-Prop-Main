@@ -4,9 +4,10 @@ Thermodynamic calculator module.
 Provides the core calculation engine using CoolProp, independent of UI.
 """
 
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor
 
 from natural_gas_main.config.settings import config
 from natural_gas_main.core.exceptions import (
@@ -175,6 +176,7 @@ class ThermoCalculator:
         
         result = None
         used_backend = ""
+        failures: List[str] = []
         neqsim_broken = False
         
         for backend in backends:
@@ -202,6 +204,7 @@ class ThermoCalculator:
                 break
                 
             except (StateUpdateError, ThermoCalculationError, ValueError, RuntimeError) as e:
+                failures.append(f"{backend}: {e}")
                 self.logger.warning(f"Backend {backend} failed: {e}")
                 if isinstance(e, BackendNotAvailableError) and backend.startswith("neqsim-"):
                     if "bulunamadı" in str(e) or "desteklemiyor" in str(e):
@@ -229,6 +232,13 @@ class ThermoCalculator:
                 raise ThermoCalculationError(
                     "Hesaplama tüm yöntemlerle (HEOS, SRK, PR, AGA8, ANN10) tamamlanamadı."
                 )
+
+        # Surface the fallback reason for transparent reporting (UI + reports).
+        if result is not None and failures:
+            result.backend_fallback_info = (
+                "İstenen model başarısız olduğu için alternatif bir modelle "
+                "hesaplandı. Başarısız girişimler: " + "; ".join(failures)
+            )
 
         return result, used_backend
     
@@ -383,26 +393,8 @@ class ThermoCalculator:
             ppr, tpr = float('nan'), float('nan')
             self.logger.debug("Pseudo-critical properties could not be calculated")
 
-        # 2. Add GERG-2008 & AGA8-Detail (skip if non-AGA8 components present)
-        if not self._has_non_aga8_components(mixture):
-            for method in ["GERG-2008", "AGA8-Detail"]:
-                try:
-                    res = calculate_aga8(mixture, temperature_k, pressure_pa, method)
-                    comparisons.append(ZFactorComparison(
-                        method=method,
-                        z_factor=res.compressibility_factor,
-                        density=res.density,
-                        molar_mass=res.molar_mass,
-                        enthalpy=res.enthalpy,
-                        entropy=res.entropy,
-                        cp=res.cp,
-                        cv=res.cv,
-                        ppr=ppr, tpr=tpr, valid=True, warning=None
-                    ))
-                except Exception as e:
-                    self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
-
-        # 2.5 Add NeqSim backends for comparison
+        # 2.5 Add NeqSim backends for comparison (serial: JVM/JPype is not
+        # thread-safe, so NeqSim is deliberately excluded from the pool below).
         if NEQSIM_AVAILABLE:
             for method in ["neqsim-gerg2008", "neqsim-srk", "neqsim-pr", "neqsim-srk-cpa"]:
                 if self._is_neqsim_backend(main_backend or "") and method == main_backend:
@@ -435,41 +427,94 @@ class ThermoCalculator:
                 except Exception as e:
                     self.logger.info(f"NeqSim {method} comparison skipped (NeqSim/JVM may not be available): {e}")
 
-        # 3. Add HEOS, SRK, PR — reuse main result when available
-        for method in ["HEOS", "SRK", "PR"]:
+        # 2.6 + 3. GERG-2008, AGA8-Detail, HEOS, SRK and PR run in parallel.
+        # These backends are independent (CoolProp AbstractState / pyaga8
+        # engines are thread-safe for separate instances), which speeds up the
+        # comparison matrix without touching the non-thread-safe NeqSim bridge.
+        def _build_aga8(method: str) -> Optional[ZFactorComparison]:
+            if self._has_non_aga8_components(mixture):
+                return None
+            if method == main_backend and main_actual is not None:
+                a = main_actual
+                return ZFactorComparison(
+                    method=method,
+                    z_factor=a.compressibility_factor,
+                    density=a.density,
+                    molar_mass=a.molar_mass,
+                    enthalpy=a.enthalpy,
+                    entropy=a.entropy,
+                    cp=a.cp,
+                    cv=a.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                )
             try:
-                if method == "HEOS" and mixture.check_heos_compatibility():
-                    continue
-                if method == main_backend and main_actual is not None:
-                    # Reuse already-computed values instead of a second state
-                    a = main_actual
-                    comparisons.append(ZFactorComparison(
-                        method=method,
-                        z_factor=a.compressibility_factor,
-                        density=a.density,
-                        molar_mass=a.molar_mass,
-                        enthalpy=a.enthalpy,
-                        entropy=a.entropy,
-                        cp=a.cp,
-                        cv=a.cv,
-                        ppr=ppr, tpr=tpr, valid=True, warning=None
-                    ))
-                else:
-                    state = self._create_state(mixture, temperature_k, pressure_pa, method)
-                    res = self._calculate_actual_conditions(state)
-                    comparisons.append(ZFactorComparison(
-                        method=method,
-                        z_factor=res.compressibility_factor,
-                        density=res.density,
-                        molar_mass=res.molar_mass,
-                        enthalpy=res.enthalpy,
-                        entropy=res.entropy,
-                        cp=res.cp,
-                        cv=res.cv,
-                        ppr=ppr, tpr=tpr, valid=True, warning=None
-                    ))
+                res = calculate_aga8(mixture, temperature_k, pressure_pa, method)
+                return ZFactorComparison(
+                    method=method,
+                    z_factor=res.compressibility_factor,
+                    density=res.density,
+                    molar_mass=res.molar_mass,
+                    enthalpy=res.enthalpy,
+                    entropy=res.entropy,
+                    cp=res.cp,
+                    cv=res.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                )
+            except Exception as e:
+                self.logger.debug(f"AGA8 {method} comparison unavailable: {e}")
+                return None
+
+        def _build_coolprop(method: str) -> Optional[ZFactorComparison]:
+            if method == "HEOS" and mixture.check_heos_compatibility():
+                return None
+            if method == main_backend and main_actual is not None:
+                # Reuse already-computed values instead of a second state
+                a = main_actual
+                return ZFactorComparison(
+                    method=method,
+                    z_factor=a.compressibility_factor,
+                    density=a.density,
+                    molar_mass=a.molar_mass,
+                    enthalpy=a.enthalpy,
+                    entropy=a.entropy,
+                    cp=a.cp,
+                    cv=a.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                )
+            try:
+                state = self._create_state(mixture, temperature_k, pressure_pa, method)
+                res = self._calculate_actual_conditions(state)
+                return ZFactorComparison(
+                    method=method,
+                    z_factor=res.compressibility_factor,
+                    density=res.density,
+                    molar_mass=res.molar_mass,
+                    enthalpy=res.enthalpy,
+                    entropy=res.entropy,
+                    cp=res.cp,
+                    cv=res.cv,
+                    ppr=ppr, tpr=tpr, valid=True, warning=None
+                )
             except Exception as e:
                 self.logger.debug(f"{method} comparison skipped: {e}")
+                return None
+
+        parallel_methods = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
+        by_method: Dict[str, ZFactorComparison] = {}
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = []
+            for method in parallel_methods:
+                if method in ("GERG-2008", "AGA8-Detail"):
+                    futures.append(executor.submit(_build_aga8, method))
+                else:
+                    futures.append(executor.submit(_build_coolprop, method))
+            for future in futures:
+                comp = future.result()
+                if comp is not None:
+                    by_method[comp.method] = comp
+        for method in parallel_methods:
+            if method in by_method:
+                comparisons.append(by_method[method])
 
         return comparisons
 
@@ -837,9 +882,46 @@ class ThermoCalculator:
                 except Exception as e:
                     self.logger.debug(f"NeqSim hydrate calculation failed: {e}")
 
-            # Average of the three empirical models only
-            temps = [t_k_hammerschmidt, t_k_motiee, t_k_towler_mokhatab]
-            t_k_average = sum(temps) / len(temps)
+            # Empirical model validity ranges (SG, max pressure in psia).
+            # Out-of-range models are excluded from the average to avoid
+            # corrupting the result with a large extrapolation error.
+            model_ranges = {
+                "Hammerschmidt": (0.55, 0.70, 1500.0),
+                "Motiee": (0.55, 0.90, 1500.0),
+                "Towler-Mokhatab": (0.60, 1.00, 1500.0),
+            }
+            model_temps = {
+                "Hammerschmidt": t_k_hammerschmidt,
+                "Motiee": t_k_motiee,
+                "Towler-Mokhatab": t_k_towler_mokhatab,
+            }
+            validity_warnings = []
+            valid_temps = []
+            for model_name, sg_limits in model_ranges.items():
+                sg_min, sg_max, p_max_psia = sg_limits
+                reasons = []
+                if not (sg_min <= specific_gravity <= sg_max):
+                    reasons.append(
+                        f"SG={specific_gravity:.3f} ({sg_min}-{sg_max} aralığı dışında)"
+                    )
+                if p_psia > p_max_psia:
+                    reasons.append(f"P={p_psia:.0f} psia (> {p_max_psia:.0f} psia)")
+                if reasons:
+                    validity_warnings.append(
+                        f"{model_name} modeli geçerlilik dışı "
+                        f"({'; '.join(reasons)}); ortalamadan çıkarıldı."
+                    )
+                else:
+                    valid_temps.append(model_temps[model_name])
+
+            # Average of the valid empirical models only
+            if not valid_temps:
+                validity_warnings.append(
+                    "Hiçbir ampirik model geçerlilik aralığında değil; "
+                    "tüm modellerin ortalaması gösterilir."
+                )
+                valid_temps = list(model_temps.values())
+            t_k_average = sum(valid_temps) / len(valid_temps)
 
             # NeqSim CPA result shown separately (recommended)
             neqsim_result: Optional[float] = None
@@ -867,7 +949,8 @@ class ThermoCalculator:
                 risk_hammerschmidt=risk_hammerschmidt,
                 risk_motiee=risk_motiee,
                 risk_towler_mokhatab=risk_towler_mokhatab,
-                risk_average=risk_average
+                risk_average=risk_average,
+                model_validity_warnings=validity_warnings
             )
         except Exception as e:
             self.logger.error(f"Error calculating hydrate formation: {e}")
@@ -1029,26 +1112,26 @@ class ThermoCalculator:
         viscosity = None
         try:
             viscosity = state.viscosity() / 0.001  # Pa·s → cP
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug(f"CoolProp viscosity unavailable: {e}")
 
         thermal_conductivity = None
         try:
             thermal_conductivity = state.conductivity()  # W/m·K
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug(f"CoolProp thermal conductivity unavailable: {e}")
 
         joule_thomson = None
         try:
             joule_thomson = state.joule_thomson_coefficient()  # K/Pa
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug(f"CoolProp Joule-Thomson coefficient unavailable: {e}")
 
         surface_tension_val = None
         try:
             surface_tension_val = state.surface_tension()  # N/m
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug(f"CoolProp surface tension unavailable: {e}")
         
         return ActualConditionResults(
             temperature=state.T(),
@@ -1484,25 +1567,46 @@ class ThermoCalculator:
         mass = rho_actual * volume_actual  # kg
         volume_std = mass / rho_std  # Sm³
         
-        # Calculate Normal Volume (NCM) @ 0°C, 1 atm
+        # Calculate Normal Volume (NCM) @ 0°C, 1 atm with backend fallback.
+        # NeqSim backends are not supported by CoolProp's _create_state, and
+        # HEOS may be incompatible with heavy components (often the reason a
+        # user picked NeqSim). Instead of forcing HEOS and reporting a bogus
+        # "condensation" error, walk the [selected, SRK, PR, HEOS] chain.
         volume_norm = None
         error_msg = None
-        try:
-            # NeqSim backends not supported by CoolProp _create_state
-            norm_backend = backend
-            if self._is_neqsim_backend(backend):
-                norm_backend = "HEOS"
-            state_norm = self._create_state(
-                mixture, 
-                config.T_NORMAL, 
-                config.P_NORMAL, 
-                norm_backend
+        if self._is_neqsim_backend(backend):
+            first = "SRK" if mixture.check_heos_compatibility() else "HEOS"
+            norm_backends = [first, "SRK", "PR", "HEOS"]
+        else:
+            norm_backends = [backend, "SRK", "PR", "HEOS"]
+
+        seen = set()
+        norm_backends = [b for b in norm_backends if not (b in seen or seen.add(b))]
+
+        last_err: Optional[Exception] = None
+        for norm_backend in norm_backends:
+            try:
+                state_norm = self._create_state(
+                    mixture,
+                    config.T_NORMAL,
+                    config.P_NORMAL,
+                    norm_backend,
+                )
+                rho_norm = state_norm.rhomass()
+                norm_val = mass / rho_norm
+                if norm_val is not None and math.isfinite(norm_val) and norm_val > 0:
+                    volume_norm = norm_val
+                    break
+            except Exception as e:
+                last_err = e
+                self.logger.debug(f"NCM backend {norm_backend} failed: {e}")
+        else:
+            self.logger.warning(f"Failed to calculate NCM volume: {last_err}")
+            error_msg = (
+                "Normal hacim (NCM) hesaplanamadı: seçilen ve yedek "
+                "backend'ler başarısız oldu (0°C'de olası yoğuşma veya "
+                "bileşen uyumsuzluğu)."
             )
-            rho_norm = state_norm.rhomass()
-            volume_norm = mass / rho_norm
-        except Exception as e:
-            self.logger.warning(f"Failed to calculate NCM volume: {e}")
-            error_msg = "0°C'de olası yoğuşma (faz değişimi) veya hesaplama hatası"
         
         return VolumeConversion(
             actual_volume=volume_actual,

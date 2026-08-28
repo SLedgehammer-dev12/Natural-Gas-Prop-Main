@@ -85,6 +85,18 @@ class AppConfig(BaseModel):
         default=1e9,
         description="Maximum volume (m³)"
     )
+
+    # Extrapolation warning thresholds (industrial relevance)
+    # Natural gas pyrolyzes above ~700 K and AGA8 is not defined above ~65 MPa.
+    # Values beyond these are allowed but flagged as engineering extrapolation.
+    EXTRAPOLATION_TEMP_K: float = Field(
+        default=1000.0,
+        description="Above this temperature results are extrapolation (K)"
+    )
+    EXTRAPOLATION_PRESS_PA: float = Field(
+        default=70_000_000.0,
+        description="Above this pressure results are extrapolation (Pa) - ~700 bar"
+    )
     
     # UI Settings
     WINDOW_WIDTH: int = Field(
@@ -96,7 +108,7 @@ class AppConfig(BaseModel):
         description="Main window height (pixels)"
     )
     WINDOW_TITLE: str = Field(
-        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.7.3 - Modüler)",
+        default="Termodinamik Gaz Karışımı Hesaplayıcı (Sürüm v1.8.0 - Modüler)",
         description="Application window title"
     )
     UI_THEME: str = Field(
@@ -211,7 +223,7 @@ class AppConfig(BaseModel):
     
     # Update Configuration
     APP_VERSION: str = Field(
-        default="v1.7.3",
+        default="v1.8.0",
         description="Current application version"
     )
     REPO_USER: str = Field(
@@ -236,6 +248,20 @@ class AppConfig(BaseModel):
     def REPO_URL(self) -> str:
         """Get main repository URL."""
         return f"https://github.com/{self.REPO_USER}/{self.REPO_NAME}/tree/{self.BRANCH_NAME}"
+
+    ENGINEERING_DISCLAIMER: str = Field(
+        default=(
+            "MÜHENDİSLİK SORUMLULUK REDDİ (ENGINEERING DISCLAIMER): "
+            "Bu yazılım, termodinamik modeller (CoolProp, AGA8/ISO 20765, NeqSim, "
+            "Standing-Katz) kullanarak yalnızca hesaplamalı TAHMİNLER üretir. Sonuçlar; "
+            "güvenlik sınıfı tasarım, yasal/sözleşmesel faturalama veya kritik endüstriyel "
+            "karar için doğrudan kullanıma uygun DEĞİLDİR. Tüm değerler yetkili bir mühendis "
+            "tarafından ilgili standartlara (ISO 6976, AGA 8, ISO 13443 vb.) göre "
+            "doğrulanmalı ve onaylanmalıdır. Yazılım sağlayıcısı, sonuçların kullanımından "
+            "doğacak her türlü kayıp veya zarardan sorumlu tutulamaz."
+        ),
+        description="Engineering disclaimer shown in reports and dialogs"
+    )
 
     def get_available_backends(self) -> List[str]:
         """Return available backends filtered by NeqSim availability.

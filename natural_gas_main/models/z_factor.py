@@ -52,7 +52,8 @@ class StandingKatzZFactor:
     Z_MIN = 0.25194
     Z_MAX = 2.66
     DAK_TOLERANCE = 1e-4
-    DAK_MAX_ITERATIONS = 20
+    DAK_MAX_ITERATIONS = 50
+    DAK_RELAXATION = 0.5
 
     WB1_5 = [
         [-1.5949, 7.9284, 7.2925],
@@ -106,12 +107,19 @@ class StandingKatzZFactor:
         are present in the mixture.
         """
         mole_fractions = self._mole_fractions(mixture)
+        # Normalize raw user names (e.g. "H2S", "CO2", "Metan") to standard
+        # CoolProp names so acid-gas lookups below work for any input alias.
+        # Aliases that map to the same CoolProp name are merged.
+        std_fractions: Dict[str, float] = {}
+        for name, x in mole_fractions.items():
+            key = GasMixture._format_gas_name_for_coolprop(name)
+            std_fractions[key] = std_fractions.get(key, 0.0) + x
+
         tpc = 0.0
         ppc = 0.0
         molar_mass = 0.0
 
-        for name, x in mole_fractions.items():
-            cp_name = GasMixture._format_gas_name_for_coolprop(name)
+        for cp_name, x in std_fractions.items():
             if cp_name not in self._props_cache:
                 self._props_cache[cp_name] = (
                     self.cp.PropsSI("Tcrit", cp_name),
@@ -126,8 +134,8 @@ class StandingKatzZFactor:
         if tpc <= 0 or ppc <= 0 or molar_mass <= 0:
             raise ValueError("Pseudo-critical properties could not be calculated")
 
-        y_h2s = mole_fractions.get("HydrogenSulfide", 0.0) + mole_fractions.get("Hidrojen Sülfür", 0.0)
-        y_co2 = mole_fractions.get("CarbonDioxide", 0.0) + mole_fractions.get("Karbondioksit", 0.0)
+        y_h2s = std_fractions.get("HydrogenSulfide", 0.0)
+        y_co2 = std_fractions.get("CarbonDioxide", 0.0)
         total_acid = y_h2s + y_co2
 
         if total_acid > 0.01:
@@ -274,29 +282,66 @@ class StandingKatzZFactor:
         a6, a7, a8, a9 = 0.5475, -0.7361, 0.1844, 0.1056
         a10, a11 = 0.6134, 0.721
 
-        z_new = 1.0
-        density = self._reduced_density(ppr, tpr, z_new)
+        # Precompute Tpr-only terms used repeatedly.
+        inv_tpr = 1.0 / tpr
+        a1_t = a1 + a2 * inv_tpr + a3 / tpr**3 + a4 / tpr**4 + a5 / tpr**5
+        a2_t = a6 + a7 * inv_tpr + a8 / tpr**2
+        a9_t = a9 * (a7 * inv_tpr + a8 / tpr**2)
+        exp_pre = a10 / tpr**3
+
+        # Newton-Raphson on f(Z) = Z - g(rho(Z)) with the DAK polynomial.
+        # Fixed-point iteration oscillates near the critical region
+        # (Tpr ~1.05–1.2, Ppr > 1.5); Newton + 0.5 damping converges robustly.
+        z = 1.0
+        converged = False
         for _ in range(self.DAK_MAX_ITERATIONS):
-            z_old = z_new
-            z_new = (
+            rho = self._reduced_density(ppr, tpr, z)
+            exp_term = math.exp(-a11 * rho * rho)
+
+            g = (
                 1
-                + (a1 + a2 / tpr + a3 / tpr**3 + a4 / tpr**4 + a5 / tpr**5) * density
-                + (a6 + a7 / tpr + a8 / tpr**2) * density**2
-                - a9 * (a7 / tpr + a8 / tpr**2) * density**5
-                + a10 * (1 + a11 * density**2) * density**2 / tpr**3 * math.exp(-a11 * density**2)
+                + a1_t * rho
+                + a2_t * rho * rho
+                - a9_t * rho ** 5
+                + exp_pre * (1 + a11 * rho * rho) * rho * rho * exp_term
             )
-            density = self._reduced_density(ppr, tpr, z_new)
-            if abs(z_new - z_old) < self.DAK_TOLERANCE:
+            f = z - g
+
+            dg_drho = (
+                a1_t
+                + 2 * a2_t * rho
+                - 5 * a9_t * rho ** 4
+                + (2 * exp_pre * rho * exp_term) * (1 + a11 * rho * rho - a11 ** 2 * rho ** 4)
+            )
+            drho_dz = -rho / z if z != 0.0 else 0.0
+            df_dz = 1.0 - dg_drho * drho_dz
+
+            if abs(df_dz) < 1e-12:
+                # Singular Jacobian; perturb and retry once to escape a saddle.
+                z += 0.01
+                continue
+
+            z_new = z - self.DAK_RELAXATION * f / df_dz
+            if not math.isfinite(z_new) or z_new <= 0:
+                raise ValueError(
+                    f"DAK Newton iteration produced non-physical Z "
+                    f"(z_new={z_new:.4f}) at Ppr={ppr:.2f}, Tpr={tpr:.2f}"
+                )
+
+            if abs(z_new - z) < self.DAK_TOLERANCE:
+                z = z_new
+                converged = True
                 break
-        else:
-            import logging
-            logging.getLogger(__name__).warning(
+            z = z_new
+
+        if not converged:
+            raise ValueError(
                 f"DAK did not converge after {self.DAK_MAX_ITERATIONS} iterations. "
-                f"Last Z={z_new:.4f}, Ppr={ppr:.2f}, Tpr={tpr:.2f}"
+                f"Last Z={z:.4f}, Ppr={ppr:.2f}, Tpr={tpr:.2f}"
             )
-        if not math.isfinite(z_new) or z_new <= 0:
+        if not math.isfinite(z) or z <= 0:
             raise ValueError("DAK did not converge to a physical Z value")
-        return z_new
+        return z
 
     def _ann(self, ppr: float, tpr: float, wb1: list, wb2: list, wb3: list) -> float:
         ppr_n = 2.0 / (self.PPR_MAX - self.PPR_MIN) * (ppr - self.PPR_MIN) - 1.0

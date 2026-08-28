@@ -141,14 +141,17 @@ def validate_volume(volume_m3: float) -> None:
 def validate_gas_fraction(fraction: float) -> None:
     """
     Validate gas fraction percentage (0-100).
-    
+
+    Zero (0.00%) is allowed so chromatograph templates that report undetected
+    gases as 0.00% can be loaded; only negatives are rejected.
+
     Args:
         fraction: Gas fraction in percent (0-100)
         
     Raises:
         ValidationError: If fraction is out of valid range
     """
-    if fraction <= 0 or fraction > 100:
+    if fraction < 0 or fraction > 100:
         raise ValidationError(
             "Gaz Yüzdesi",
             f"0 ile 100 arasında olmalıdır. Girilen: {fraction}"

@@ -1,3 +1,69 @@
+# Natural Gas Prop Main v1.8.0
+
+**Tarih:** 28 Ağustos 2026
+
+## Mühendislik Güçlendirme Seti
+
+### Doğruluk Düzeltmeleri
+
+| # | Düzeltme | Etki |
+|---|----------|------|
+| D1 | **Standart Basınç Birim Hatası** | Standart koşullar satırı artık `101.325 kPa` doğru gösteriliyor (önceden `101325.000 kPa` basılıyordu). |
+| D2 | **Wichert-Aziz İsim Eşleme** | Asit gaz düzeltmesi artık `H2S`, `CO2`, `Metan`, `Hidrojen Sülfür` gibi takma adlarla da çalışıyor; ekşi gaz Z değerleri doğru düzeltiliyor. |
+| D3 | **DAK Yakınsama** | Sabit-nokta iterasyonu yerine analitik türevli Newton-Raphson + 0.5 damping. Kritik bölgede (Tpr≈1.05-1.2, Ppr>1.5) salınım giderildi; yakınsamayan sonuç artık geçersiz işaretleniyor. |
+| D4 | **Hidrat Model Geçerliliği** | Hammerschmidt/Motiee/Towler-Mokhatab modelleri SG ve basınç aralıklarıyla filtreleniyor; sınır dışı modeller ortalamadan çıkarılıp kullanıcıya uyarı gösteriliyor. |
+| D5 | **NCM Fallback** | Normal hacim hesabı `[seçilen, SRK, PR, HEOS]` zinciriyle deneniyor; yanıltıcı "yoğuşma" mesajı netleştirildi. |
+
+### Girdi Güvenliği
+
+- Türkçe virgül (`,`) girişi sıcaklık, basınç ve hacim alanlarında destekleniyor
+- `%0.00` bileşenler (kromatograf şablonlarında tespit edilmeyen gazlar) artık geçerli ve hesaba katılmadan filtreleniyor
+- `.ngp` dosya doğrulaması Pydantic `GasMixture` modeliyle güçlendirildi (negatif oran / geçersiz tip engellenir)
+- >1000 K veya >700 bar girişlerde **Ekstrapolasyon Uyarısı**
+
+### Robustness
+
+- CoolProp taşınım özellikleri (viskozite, iletkenlik, JT, yüzey gerilimi) artık hesaplanıp **gösteriliyor**; hesaplanamayanlar "Model Desteklemiyor" olarak işaretleniyor
+- AGA8 stderr yönlendirmesi thread-lock ile serileştirildi (paralel hesapta fd bozulması önlendi)
+- Log handler pencere kapanışında temizleniyor (TclError / kaynak sızıntısı giderildi)
+- Fallback nedeni sonuç tablosunda şeffaf gösteriliyor
+
+### UX & Raporlama
+
+- **"100%'e Normalleştir"** butonu
+- **"Panodan Yapıştır"**: Excel/kromatograf verisi tek tıkla tabloya aktarılır (Türkçe/İngilizce isimler desteklenir)
+- **Özel şablon yönetimi**: Kuyu/hat kompozisyonları isim vererek kaydedilip silinebilir
+- **Molar ↔ Kütlesel %** otomatik dönüşüm
+- Çift-tık ile gaz ekleme, oran kutusunda Enter ile sonraki satıra geçme
+- **Excel (.xlsx) ve CSV** dışa aktarma; sonuç tablosuna sağ-tık "Tabloyu Kopyala"
+- **PDF raporuna model karşılaştırma matrisi** eklendi
+- **Mühendislik Sorumluluk Reddi** (Engineering Disclaimer) tüm raporlara ve Hakkında penceresine eklendi
+
+### Performans & Güvenlik
+
+- Z-karşılaştırma matrisi CoolProp/AGA8 için paralelleştirildi (`ThreadPoolExecutor`); NeqSim (JPype) güvenliği için seri kaldı
+- Güncelleyici: açılışta sessiz sürüm kontrolü (opt-in) ve SHA-256 bütünlük farkındalığı; GitHub dışı indirme URL'leri engelleniyor
+
+### Mobil
+
+- `scripts/sync_mobile_core.py`: masaüstü çekirdek modülleri Android Chaquopy kaynağına senkronize eden betik (UI hariç)
+
+## Build & Dağıtım
+
+| Platform | Format |
+|----------|--------|
+| Windows | `.exe` / `.zip` (onedir) |
+| macOS | `.app` (`.dmg`) |
+
+## Test Altyapısı
+
+| Metrik | v1.8.0 |
+|--------|--------|
+| Test sayısı | **672** |
+| Coverage | **%94** |
+
+---
+
 # Natural Gas Prop Main v1.7.2
 
 **Tarih:** 3 Temmuz 2026
@@ -17,7 +83,7 @@
 |----------|--------|-------|----------|
 | Windows | `.zip` (gömülü portable Python) | ~70 MB | Kurumsal / AV korumalı / Sessiz VBS |
 | Windows | `.zip` (onedir klasör) | ~65 MB | Standart klasör yapılı derleme |
-| macOS | `.dmg` (`.app` bundle) | ~55 MB | Standart macOS sürümü |
+| macOS | `.dmg` (`.app` bundle) | ~55 MB | Standart macOS sürümü | 5574e03 (feat(v1.8.0): engineering hardening + UX/reporting overhaul)
 
 ---
 

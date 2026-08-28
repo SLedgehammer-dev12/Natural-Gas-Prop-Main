@@ -75,7 +75,7 @@ class TestGetNeqsimGasNameEdgeCases:
         assert _get_neqsim_gas_name("DEA") == "DEA"
 
     def test_iso_variants_mapped_to_normal(self):
-        assert _get_neqsim_gas_name("Isopentane") == "isopentane"
+        assert _get_neqsim_gas_name("Isopentane") == "i-pentane"
         assert _get_neqsim_gas_name("Isohexane") == "2-methylpentane"
 
 

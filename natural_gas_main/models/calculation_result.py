@@ -156,6 +156,12 @@ class HydrateResults(BaseModel):
     risk_motiee: bool = Field(..., description="Risk of hydrate formation using Motiee")
     risk_towler_mokhatab: bool = Field(..., description="Risk of hydrate formation using Towler-Mokhatab")
     risk_average: bool = Field(..., description="Risk of hydrate formation based on average temperature")
+
+    # Validity warnings for the empirical models (e.g. SG / pressure out of range)
+    model_validity_warnings: List[str] = Field(
+        default_factory=list,
+        description="Warnings when an empirical model is outside its validity range"
+    )
     
     model_config = {"frozen": False}
 
@@ -168,6 +174,10 @@ class CalculationResult(BaseModel):
     """
     
     backend_used: str = Field(..., description="Thermodynamic backend used (HEOS, SRK, PR)")
+    backend_fallback_info: Optional[str] = Field(
+        default=None,
+        description="Explanation of why a fallback backend was used instead of the requested one"
+    )
     actual: ActualConditionResults = Field(..., description="Actual condition results")
     standard: StandardConditionResults = Field(..., description="Standard condition results")
     heating: Optional[HeatingValues] = Field(None, description="Heating values (if calculable)")
@@ -203,6 +213,8 @@ class CalculationResult(BaseModel):
         results.append(("Hesaplama Yöntemi (Termo)", self.backend_used, ""))
         if self.z_fallback_warning:
             results.append(("Sınırlı Fallback Uyarısı", self.z_fallback_warning, ""))
+        if self.backend_fallback_info:
+            results.append(("Model Değişikliği", self.backend_fallback_info, ""))
         
         # Density
         density_val, density_unit = ResultUnitConverter.convert_density(
@@ -253,7 +265,7 @@ class CalculationResult(BaseModel):
         std_t_k = self.standard.reference_temperature
         std_p_pa = self.standard.reference_pressure
         results.append(("- STANDART ÇEVRİM BİLGİLERİ -", "", ""))
-        results.append(("Standart Koşullar", f"{std_t_k:.2f} K, {std_p_pa:.3f} kPa", "-"))
+        results.append(("Standart Koşullar", f"{std_t_k:.2f} K, {std_p_pa / 1000.0:.3f} kPa", "-"))
         
         # Standard density
         if self.standard.density_std is not None:
@@ -345,19 +357,43 @@ class CalculationResult(BaseModel):
                 results.append(("Hata Detayı", self.volume_conversion.normal_volume_error, ""))
         
         # Transport Properties
-        if self.transport:
+        neqsim = self.transport
+        actual = self.actual
+        viscosity = neqsim.viscosity_cp if neqsim and neqsim.viscosity_cp is not None else actual.viscosity
+        conductivity = (
+            neqsim.thermal_conductivity if neqsim and neqsim.thermal_conductivity is not None
+            else actual.thermal_conductivity
+        )
+        jt = (
+            neqsim.joule_thomson_coefficient if neqsim and neqsim.joule_thomson_coefficient is not None
+            else actual.joule_thomson_coefficient
+        )
+        surface_tension = (
+            neqsim.surface_tension if neqsim and neqsim.surface_tension is not None
+            else actual.surface_tension
+        )
+
+        transport_values = [viscosity, conductivity, jt, surface_tension]
+        has_coolprop_transport = any(
+            v is not None for v in (actual.viscosity, actual.thermal_conductivity,
+                                    actual.joule_thomson_coefficient, actual.surface_tension)
+        )
+        if neqsim is not None or has_coolprop_transport or any(v is not None for v in transport_values):
             results.append(("- TAŞINIM ÖZELLİKLERİ -", "", ""))
-            if self.transport.viscosity_cp is not None:
-                results.append(("Viskozite (μ)", f"{self.transport.viscosity_cp:.4f}", "cP"))
-            if self.transport.thermal_conductivity is not None:
-                results.append(("Termal İletkenlik (k)", f"{self.transport.thermal_conductivity:.4f}", "W/mK"))
-            if self.transport.joule_thomson_coefficient is not None:
-                results.append(("Joule-Thomson Katsayısı", f"{self.transport.joule_thomson_coefficient:.6f}", "K/Pa"))
-            if self.transport.surface_tension is not None:
-                results.append(("Yüzey Gerilimi (σ)", f"{self.transport.surface_tension:.4f}", "N/m"))
-            if self.transport.has_aqueous_phase:
+
+            def _transport_row(label: str, value, unit: str, decimals: int):
+                if value is None:
+                    return (label, "Model Desteklemiyor", unit)
+                return (label, self._format_float(value, decimals), unit)
+
+            results.append(("Taşınım Kaynağı", "NeqSim" if neqsim else "CoolProp", ""))
+            results.append(_transport_row("Viskozite (μ)", viscosity, "cP", 4))
+            results.append(_transport_row("Termal İletkenlik (k)", conductivity, "W/mK", 4))
+            results.append(_transport_row("Joule-Thomson Katsayısı", jt, "K/Pa", 6))
+            results.append(_transport_row("Yüzey Gerilimi (σ)", surface_tension, "N/m", 4))
+            if neqsim and neqsim.has_aqueous_phase:
                 results.append(("Sulu Faz", "Mevcut", ""))
-            if self.transport.has_liquid_hc_phase:
+            if neqsim and neqsim.has_liquid_hc_phase:
                 results.append(("Sıvı HC Faz", "Mevcut", ""))
 
         # Hydrate Analysis
@@ -404,6 +440,10 @@ class CalculationResult(BaseModel):
             results.append(("Motiee Riski", format_risk(self.hydrate.risk_motiee), ""))
             results.append(("Towler-Mokhatab Riski", format_risk(self.hydrate.risk_towler_mokhatab), ""))
             results.append(("Hidrat Oluşum Riski (Ortalama)", format_risk(self.hydrate.risk_average), ""))
+
+            # Validity warnings for out-of-range empirical models
+            for warning in self.hydrate.model_validity_warnings:
+                results.append(("Geçerlilik Uyarısı", warning, ""))
         
         return results
     

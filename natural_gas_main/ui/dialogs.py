@@ -114,13 +114,24 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.7.3 - Profesyonel Sürüm\n\n"
-        "v1.7.3 sürümü: Backend-gaz uyumluluk gostergeleri,\n"
-        "dinamik gaz listesi, AGA8 log duzeltmeleri.\n\n"
+        "Sürüm v1.8.0 - Profesyonel Sürüm\n\n"
+        "v1.8.0 sürümü: Mühendislik güçlendirme seti — doğruluk\n"
+        "düzeltmeleri, girdi güvenliği, UX geliştirmeleri, Excel/CSV\n"
+        "raporlama ve paralel Z-karşılaştırma.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
-        "© 2026 Kompresör Pompa"
+        "© 2026 Kompresör Pompa\n\n"
+        "MÜHENDİSLİK SORUMLULUK REDDİ:\n"
+        "Sonuçlar hesaplamalı tahmindir; güvenlik sınıfı tasarım veya\n"
+        "yasal/sözleşmesel amaçlarla doğrudan kullanıma uygun değildir.\n"
+        "Yetkili mühendis onayı zorunludur."
     )
     messagebox.showinfo("Hakkında", about_text)
+
+
+def show_engineering_disclaimer() -> None:
+    """Show the full engineering disclaimer."""
+    from natural_gas_main.config.settings import config
+    messagebox.showwarning("Mühendislik Sorumluluk Reddi", config.ENGINEERING_DISCLAIMER)
 
 
 def show_user_guide_dialog() -> None:
@@ -229,7 +240,28 @@ def show_new_features_info() -> None:
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.7.3":
+    if version == "v1.8.0":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER (Mühendislik Güçlendirme):\n\n"
+            "• DOĞRULUK: Standart basınç birim hatası düzeltildi (101.325 kPa).\n"
+            "  Wichert-Aziz asit gaz düzeltmesi artık H2S/CO2 takma adlarını\n"
+            "  ve Türkçe isimleri de tanıyor. DAK çözücü Newton-Raphson'a\n"
+            "  geçirildi (kritik bölgede yakınsama kararlılığı).\n\n"
+            "• HİDRAT: Ampirik modeller SG/basınç geçerlilik aralıklarıyla\n"
+            "  filtreleniyor; sınır dışı modeller ortalamadan çıkarılıyor.\n\n"
+            "• GİRDİ: Türkçe virgül (,) girişi destekleniyor. %0.00 bileşenler\n"
+            "  kromatograf şablonlarında artık sorun çıkarmıyor. .ngp şema\n"
+            "  doğrulaması Pydantic modeliyle güçlendirildi.\n\n"
+            "• UX: '100%'e Normalleştir', 'Panodan Yapıştır', özel şablon\n"
+            "  yönetimi, molar↔kütle otomatik dönüşüm, çift-tık/Enter kısayolları.\n\n"
+            "• RAPOR: Excel (.xlsx) ve CSV dışa aktarma, tabloyu panoya kopyalama,\n"
+            "  PDF'e model karşılaştırma matrisi eklendi.\n\n"
+            "• PERFORMANS: Z-karşılaştırma matrisi paralelleştirildi.\n"
+            "• GÜVENLİK: Engineering disclaimer tüm raporlara eklendi.\n"
+            "• 672 test, %94 coverage.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.7.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Backend-Gaz Uyumluluk Göstergeleri:\n"
@@ -348,6 +380,18 @@ def show_new_features_info() -> None:
     text_area.configure(state="disabled")
     text_area.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
     
+    # Engineering disclaimer footer
+    from natural_gas_main.config.settings import config as _config
+    disclaimer_label = ctk.CTkLabel(
+        frame,
+        text=("⚠ " + _config.ENGINEERING_DISCLAIMER),
+        font=ctk.CTkFont(size=9),
+        text_color="gray",
+        wraplength=520,
+        justify="left"
+    )
+    disclaimer_label.pack(fill=tk.X, pady=(0, 10))
+
     # Checkbox
     dont_show_var = ctk.BooleanVar(value=False)
     ctk.CTkCheckBox(

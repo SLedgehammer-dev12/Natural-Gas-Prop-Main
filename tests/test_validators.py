@@ -121,9 +121,9 @@ class TestValidateGasFraction:
     def test_valid_fraction(self):
         validate_gas_fraction(50.0)
 
-    def test_zero_raises(self):
-        with pytest.raises(ValidationError):
-            validate_gas_fraction(0.0)
+    def test_zero_allowed(self):
+        # 0.00% (undetected chromatograph gas) is a valid input
+        validate_gas_fraction(0.0)
 
     def test_negative_raises(self):
         with pytest.raises(ValidationError):

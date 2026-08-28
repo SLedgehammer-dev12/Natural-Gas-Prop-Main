@@ -112,13 +112,13 @@ def bump_spec(v: str, vi: tuple):
     text = path.read_text("utf-8")
 
     text = re.sub(
-        r"CFBundleShortVersionString',\s*'[^']*'",
-        f"CFBundleShortVersionString', '{vi[0]}.{vi[1]}.{vi[2]}'",
+        r"CFBundleShortVersionString':\s*'[^']*'",
+        f"CFBundleShortVersionString': '{vi[0]}.{vi[1]}.{vi[2]}'",
         text,
     )
     text = re.sub(
-        r"CFBundleVersion',\s*'[^']*'",
-        f"CFBundleVersion', '{vi[0]}.{vi[1]}.{vi[2]}.0'",
+        r"CFBundleVersion':\s*'[^']*'",
+        f"CFBundleVersion': '{vi[0]}.{vi[1]}.{vi[2]}.0'",
         text,
     )
 
