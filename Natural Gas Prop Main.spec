@@ -7,9 +7,11 @@ import re
 import customtkinter
 customtkinter_path = pathlib.Path(customtkinter.__file__).parent
 
-# Read version from version_info.txt for output naming
+# Read version from version_info.txt for output naming. The version is always
+# appended to the executable/app name (with a pyproject.toml fallback).
+_script_dir = pathlib.Path(globals().get('SPECPATH') or os.getcwd())
 _version = "unknown"
-_version_info_path = pathlib.Path("version_info.txt")
+_version_info_path = _script_dir / "version_info.txt"
 if _version_info_path.exists():
     _vtext = _version_info_path.read_text(encoding="utf-8")
     _m = re.search(r"FileVersion',\s*'([^']+)'", _vtext)
@@ -19,8 +21,15 @@ if _version_info_path.exists():
         _m = re.search(r"filevers=\((\d+),\s*(\d+),\s*(\d+)", _vtext)
         if _m:
             _version = f"v{_m.group(1)}.{_m.group(2)}.{_m.group(3)}"
+if _version == "unknown":
+    try:
+        import tomllib
+        _pp = tomllib.loads((_script_dir / "pyproject.toml").read_text(encoding="utf-8"))
+        _version = f"v{_pp['project']['version']}"
+    except Exception:
+        _version = "v0.0.0"
 
-_exe_name = f"Natural Gas Prop Main {_version}" if _version != "unknown" else "Natural Gas Prop Main"
+_exe_name = f"Natural Gas Prop Main {_version}"
 
 a = Analysis(
     ['run_app.py'],
@@ -87,12 +96,12 @@ if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
         name=f'{_exe_name}.app',
-        icon=None,
+        icon='assets/NaturalGasProp.icns',
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.8.1',
-            'CFBundleVersion': '1.8.1.0',
+            'CFBundleShortVersionString': '1.8.2',
+            'CFBundleVersion': '1.8.2.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',
@@ -117,6 +126,7 @@ else:
         codesign_identity=None,
         entitlements_file=None,
         version='version_info.txt',
+        icon='assets/NaturalGasProp.ico',
     )
     coll = COLLECT(
         exe,

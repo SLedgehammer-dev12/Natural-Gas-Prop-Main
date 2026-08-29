@@ -1,3 +1,31 @@
+# Natural Gas Prop Main v1.8.2
+
+**Tarih:** 29 Ağustos 2026
+
+## Hotfix: Uygulama İkonu + Sürümlü Çalıştırma Dosyası
+
+### Tematik Uygulama İkonu
+- Programa özel ikon tasarlandı: lacivert→turkuaz gradyan rozet üzerinde
+  **basınç göstergesi (gauge)** + **doğal gaz alevi** motifleri.
+- macOS için `.icns` (tüm boyutlar), Windows için `.ico` (16–256 px).
+- `assets/make_icon.py` ile tekrar üretilebilir; `Natural Gas Prop Main.spec`
+  içinde macOS BUNDLE ve Windows EXE ikonları tanımlandı.
+
+### Sürümlü Çalıştırma Dosyası
+- Executable/app adı artık her zaman sürüm numarasıyla sonlanıyor
+  (örn. `Natural Gas Prop Main v1.8.2.app` / `.exe`).
+- Spec, `version_info.txt` okunamazsa `pyproject.toml` sürümüne düşüyor;
+  sürümün ada her zaman bulunması garanti altına alındı.
+
+## Test Altyapısı
+
+| Metrik | v1.8.2 |
+|--------|--------|
+| Test sayısı | **728** |
+| Coverage | **%94** |
+
+---
+
 # Natural Gas Prop Main v1.8.1
 
 **Tarih:** 28 Ağustos 2026

@@ -114,9 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.8.1 - Profesyonel Sürüm\n\n"
-        "v1.8.1 hotfix: macOS güncelleme SSL hatası (CERTIFICATE_VERIFY_FAILED)\n"
-        "giderildi — certifi CA paketi kullanılıyor.\n\n"
+        "Sürüm v1.8.2 - Profesyonel Sürüm\n\n"
+        "v1.8.2 hotfix: tematik uygulama ikonu eklendi;\n"
+        "çalıştırma dosyası adı sürümle sonlanıyor.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa\n\n"
         "MÜHENDİSLİK SORUMLULUK REDDİ:\n"
@@ -223,7 +223,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm v1.8.1")
+    dialog.title(f"Yenilikler - Sürüm v1.8.2")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -235,11 +235,22 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.1",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.2",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.8.1":
+    if version == "v1.8.2":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER (Hotfix):\n\n"
+            "• UYGULAMA İKONU:\n"
+            "  Programa özel tematik ikon eklendi (basınç göstergesi +\n"
+            "  doğal gaz alevi). macOS (.icns) ve Windows (.ico).\n\n"
+            "• ÇALIŞTIRMA DOSYASI ADI:\n"
+            "  Executable adı artık sürüm numarasıyla sonlanıyor\n"
+            "  (örn. 'Natural Gas Prop Main v1.8.2').\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.8.1":
         info_text = (
             "📋 BU SÜRÜMDEKİ DÜZELTMELER (Hotfix):\n\n"
             "• GÜNCELLEME SSL HATASI DÜZELTİLDİ:\n"
