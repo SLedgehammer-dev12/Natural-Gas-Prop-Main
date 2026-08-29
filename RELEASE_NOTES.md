@@ -1,3 +1,48 @@
+# Natural Gas Prop Main v1.8.1
+
+**Tarih:** 28 Ağustos 2026
+
+## Hotfix: macOS Güncelleme SSL Hatası
+
+### Sorun
+macOS'ta "Güncellemeleri Denetle" çalıştırıldığında:
+
+```
+[WARNING] natural_gas_main.utils.updater: Network error checking updates:
+<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed:
+unable to get local issuer certificate (_ssl.c:1032)>
+```
+
+### Kök Neden
+- macOS python.org Python kurulumlarında varsayılan CA sertifika dosyası
+  (`etc/openssl/cert.pem`) bulunmuyor (yalnızca "Install Certificates.command"
+  çalıştırılırsa oluşturulur).
+- PyInstaller ile paketlenmiş `.app` içindeki Python'da da hiçbir CA bundle
+  yok; uygulama kendi `libssl`'ini taşıyor ama güven kökü dosyası eksik.
+- `certifi` bağımlılığı tanımlı değildi → taşınabilir CA bundle yok.
+
+### Çözüm
+- `certifi` bağımlılığı `pyproject.toml` ve `requirements.txt`'e eklendi.
+- `updater.py` artık `ssl.create_default_context(cafile=certifi.where())`
+  ile TLS context oluşturuyor; **doğrulama asla devre dışı bırakılmıyor**.
+- PyInstaller `hiddenimports`'a `certifi` eklendi → `hook-certifi.py`
+  `cacert.pem`'i `.app` paketine gömüyor.
+- `URLError` mesajı gerçek sebebi (`e.reason`) gösteriyor (diagnostik).
+
+### Doğrulama
+- Geliştirme ortamında gerçek `UpdateChecker.check_for_updates()` GitHub'a
+  karşı başarılı (200 OK).
+- Yeni SSL testleri: certifi CA kullanımı + certifi yokken güvenli fallback.
+
+## Test Altyapısı
+
+| Metrik | v1.8.1 |
+|--------|--------|
+| Test sayısı | **728** |
+| Coverage | **%94** |
+
+---
+
 # Natural Gas Prop Main v1.8.0
 
 **Tarih:** 28 Ağustos 2026

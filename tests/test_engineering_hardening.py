@@ -381,10 +381,11 @@ def test_backend_fallback_info_populated(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 7 Updater SHA-256 awareness
+# 7 Updater: SSL context, SHA-256 awareness, URL validation
 # ---------------------------------------------------------------------------
 
 def test_updater_exposes_sha256_and_validates_url(monkeypatch):
+    import ssl
     import urllib.request
     from natural_gas_main.utils.updater import UpdateChecker
 
@@ -405,12 +406,20 @@ def test_updater_exposes_sha256_and_validates_url(monkeypatch):
                 "sha256": "abc123def456",
             }).encode("utf-8")
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda url, timeout: _FakeResp())
+    seen = {}
+    def fake_urlopen(url, timeout, context=None, **kw):
+        seen["context"] = context
+        return _FakeResp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
     checker = UpdateChecker()
     has_update, info, msg = checker.check_for_updates()
     assert has_update
     assert info["sha256"] == "abc123def456"
+    # HTTPS request must use a verifiable TLS context (certifi CA bundle)
+    assert seen["context"] is not None
+    assert seen["context"].verify_mode == ssl.CERT_REQUIRED
 
 
 def test_updater_blocks_non_github_download_url(monkeypatch):
@@ -432,9 +441,60 @@ def test_updater_blocks_non_github_download_url(monkeypatch):
                 "download_url": "https://evil.example.com/malware.zip",
             }).encode("utf-8")
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda url, timeout: _FakeResp())
+    monkeypatch.setattr(
+        urllib.request, "urlopen",
+        lambda url, timeout=5, context=None, **kw: _FakeResp()
+    )
 
     checker = UpdateChecker()
     has_update, info, _ = checker.check_for_updates()
     assert has_update
     assert "github.com" in info["download_url"]
+
+
+def test_updater_ssl_context_uses_certifi_ca(monkeypatch):
+    """The update TLS context must be built from the certifi CA bundle and verify peers."""
+    import ssl
+    import certifi
+    from natural_gas_main.utils import updater
+
+    captured = {}
+    real_create = ssl.create_default_context
+
+    def fake_create_default_context(**kwargs):
+        captured["kwargs"] = kwargs
+        return real_create(**kwargs)
+
+    monkeypatch.setattr(ssl, "create_default_context", fake_create_default_context)
+
+    ctx = updater._build_ssl_context()
+    assert captured["kwargs"].get("cafile") == certifi.where()
+    assert ctx.verify_mode == ssl.CERT_REQUIRED
+
+
+def test_updater_ssl_context_fallback_without_certifi(monkeypatch):
+    """If certifi is unavailable, fall back to the default trust store (still verified)."""
+    import builtins
+    import ssl
+    from natural_gas_main.utils import updater
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "certifi":
+            raise ImportError("certifi unavailable (test)")
+        return real_import(name, *args, **kwargs)
+
+    captured = {}
+    real_create = ssl.create_default_context
+
+    def fake_create_default_context(**kwargs):
+        captured["kwargs"] = kwargs
+        return real_create(**kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(ssl, "create_default_context", fake_create_default_context)
+
+    ctx = updater._build_ssl_context()
+    assert "cafile" not in captured["kwargs"]
+    assert ctx.verify_mode == ssl.CERT_REQUIRED

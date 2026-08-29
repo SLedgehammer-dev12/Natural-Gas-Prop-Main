@@ -41,6 +41,7 @@ a = Analysis(
         'customtkinter',
         'packaging',
         'pydantic',
+        'certifi',
     ],
     hookspath=['hooks'],
     hooksconfig={},
@@ -90,8 +91,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.kompresorpompa.naturalgasprop',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.8.0',
-            'CFBundleVersion': '1.8.0.0',
+            'CFBundleShortVersionString': '1.8.1',
+            'CFBundleVersion': '1.8.1.0',
             'CFBundleName': 'Natural Gas Prop Main',
             'CFBundleDisplayName': 'Natural Gas Prop Main',
             'LSMinimumSystemVersion': '10.15',

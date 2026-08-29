@@ -114,10 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.8.0 - Profesyonel Sürüm\n\n"
-        "v1.8.0 sürümü: Mühendislik güçlendirme seti — doğruluk\n"
-        "düzeltmeleri, girdi güvenliği, UX geliştirmeleri, Excel/CSV\n"
-        "raporlama ve paralel Z-karşılaştırma.\n\n"
+        "Sürüm v1.8.1 - Profesyonel Sürüm\n\n"
+        "v1.8.1 hotfix: macOS güncelleme SSL hatası (CERTIFICATE_VERIFY_FAILED)\n"
+        "giderildi — certifi CA paketi kullanılıyor.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa\n\n"
         "MÜHENDİSLİK SORUMLULUK REDDİ:\n"
@@ -224,7 +223,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm {version}")
+    dialog.title(f"Yenilikler - Sürüm v1.8.1")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -236,11 +235,22 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM {version}",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.1",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.8.0":
+    if version == "v1.8.1":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ DÜZELTMELER (Hotfix):\n\n"
+            "• GÜNCELLEME SSL HATASI DÜZELTİLDİ:\n"
+            "  macOS'ta 'CERTIFICATE_VERIFY_FAILED' hatası giderildi.\n"
+            "  Güncelleme denetimi artık certifi CA paketini kullanıyor;\n"
+            "  macOS python.org ve paketlenmiş .app sürümlerinde HTTPS\n"
+            "  doğrulaması güvenli şekilde çalışıyor.\n\n"
+            "• TLS doğrulaması asla devre dışı bırakılmıyor (güvenlik korunur).\n"
+            "• Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.8.0":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER (Mühendislik Güçlendirme):\n\n"
             "• DOĞRULUK: Standart basınç birim hatası düzeltildi (101.325 kPa).\n"

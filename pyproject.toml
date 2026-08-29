@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "natural-gas-prop-main"
-version = "1.8.0"
+version = "1.8.1"
 description = "Termodinamik doğal gaz karışımı hesaplama uygulaması"
 readme = "README.md"
 license = { text = "Proprietary - Kompresör Pompa" }
@@ -23,6 +23,7 @@ dependencies = [
     "packaging>=21.0",
     "neqsim>=3.6.1",
     "openpyxl>=3.1.0",
+    "certifi>=2024.0.0",
 ]
 
 [project.scripts]
