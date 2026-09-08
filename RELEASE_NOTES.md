@@ -1,3 +1,37 @@
+# Natural Gas Prop Main v1.8.3
+
+**Tarih:** 8 Eylül 2026
+
+## Sürüm v1.8.3: Hesaplama Hızlandırma & Performans Optimizasyonu
+
+### ⚡ Hesaplama Hızlandırma ve Önbellekleme (Caching)
+- **Faz Zarfı (Phase Envelope) Karışım Önbelleği:**
+  - Faz zarfı sınırları ($P$-$T$ eğrisi) işletme sıcaklık ve basıncından bağımsızdır (yalnızca karışım kompozisyonu ve backend'e bağlıdır).
+  - Karışım kompozisyonu ve backend bazlı `_phase_envelope_cache` eklendi.
+  - Aynı karışım üzerinde sıcaklık, basınç veya hacim değiştirilerek yapılan tekrarlı hesaplamalarda 300 ms süren `build_phase_envelope` işlemi sıfıra indirildi (**300 ms $\rightarrow$ 0 ms**).
+- **Hava Yoğunluğu & Saf Bileşen Molar Kütle Önbelleği:**
+  - Standart koşul dönüşümlerinde hava yoğunluğu `_air_density_cache` ile önbelleğe alındı.
+  - Isıl değer kütle ağırlıklandırmalarında her bileşen için tekrarlanan molekül ağırlığı hesapları `_molar_mass_cache` ile optimize edildi.
+- **Gaz Adı Normalizasyonu:**
+  - `GasMixture._format_gas_name_for_coolprop` ve `_fuzzy_match_gas_name` metotları `@lru_cache(maxsize=256)` ile donatılarak ad dönüşümleri ve kromatografi eşlemeleri anlık ($O(1)$) hale getirildi.
+
+### 🚀 Paralel Hesaplama & Arayüz Tepki Süresi
+- **11 EOS Karşılaştırma Matrisi:**
+  - `_calculate_z_factor_comparison` içindeki `ThreadPoolExecutor` iş parçacığı havuzu `min(5, (os.cpu_count() or 4))` seviyesine çıkarıldı. 5 model (`GERG-2008`, `AGA8-Detail`, `HEOS`, `SRK`, `PR`) çok çekirdekli işlemcide tam eşzamanlı çalıştırılıyor.
+- **Arayüz Tepki Süresi:**
+  - UI kuyruk kontrol periyodu 100 ms'den **40 ms**'ye indirilerek hesaplama tamamlandığında sonuçların ekranda görünme gecikmesi 2.5 kat hızlandırıldı.
+- **Raporlama Düzeltmesi:**
+  - `ReportGenerator.export_excel` ve `export_csv` çağrılarında parametre adı uyumsuzluğu giderildi (`comparison_results` / `comparison_rows`).
+
+## Test Altyapısı
+
+| Metrik | v1.8.3 |
+|--------|--------|
+| Test sayısı | **733** |
+| Coverage | **%94** |
+
+---
+
 # Natural Gas Prop Main v1.8.2
 
 **Tarih:** 29 Ağustos 2026

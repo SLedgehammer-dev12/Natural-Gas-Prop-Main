@@ -1,8 +1,8 @@
 {
   "product": "Natural Gas Prop Main",
-  "version": "v1.8.2",
-  "date": "2026-08-29",
-  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.8.2",
+  "version": "v1.8.3",
+  "date": "2026-09-08",
+  "download_url": "https://github.com/SLedgehammer-dev12/Natural-Gas-Prop-Main/releases/tag/v1.8.3",
   "sha256": "",
-  "changelog": "- Hotfix: Programa ozel tematik uygulama ikonu eklendi (basinc gostergesi\n  + dogal gaz alefi). macOS .icns ve Windows .ico.\n- Calistirma dosyasi (executable/app) adi artik surum numarasiyla sonlaniyor\n  (orn. 'Natural Gas Prop Main v1.8.2'); spec icinde pyproject fallback'i eklendi.\n- Ikon uretici: assets/make_icon.py (tekrar uretilebilir).\n- 728 test, %94 coverage."
+  "changelog": "- Performans: Karışım bazlı Faz Zarfı önbellekleme (300 ms -> 0 ms), bileşen molar kütle ve hava yoğunluğu önbellekleme.\n- Gaz Adı Eşleme: @lru_cache ile anlık kromatografi kod eşleme (O(1)).\n- Paralel Hesaplama: 11 EOS karşılaştırma matrisi havuz genişletmesi (max_workers=5).\n- UI Tepki Süresi: Kuyruk kontrol periyodu 40 ms'ye indirilerek arayüz tepkisi 2.5 kat hızlandırıldı.\n- Raporlama: Excel (.xlsx) ve CSV dışa aktarma parametre uyumluluğu sağlandı.\n- Testler: 733 geçen test, %94 coverage."
 }

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Main application window.
 
 Coordinates between input panel, output panel, calculator, and user interactions.
@@ -424,7 +424,7 @@ class ThermoApp(ctk.CTk):
         except queue.Empty:
             pass
         finally:
-            self.after(100, self._check_queue)
+            self.after(40, self._check_queue)
             
     def _run_calculation(self, inputs: dict):
         """
@@ -615,12 +615,12 @@ class ThermoApp(ctk.CTk):
             if lower.endswith(".xlsx"):
                 ReportGenerator.export_excel(
                     input_params, results, gas_composition,
-                    file_path, comparison_rows=comparison_rows
+                    file_path, comparison_results=comparison_rows
                 )
             elif lower.endswith(".csv"):
                 ReportGenerator.export_csv(
                     results, gas_composition, file_path,
-                    comparison_rows=comparison_rows
+                    comparison_results=comparison_rows
                 )
             elif lower.endswith(".pdf"):
                 # Save plot to temp file

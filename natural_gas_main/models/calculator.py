@@ -5,8 +5,10 @@ Provides the core calculation engine using CoolProp, independent of UI.
 """
 
 from typing import Optional, Tuple, List, Dict
+from functools import lru_cache
 import logging
 import math
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from natural_gas_main.config.settings import config
@@ -75,14 +77,35 @@ class ThermoCalculator:
         
         self.logger = logging.getLogger(__name__)
         self.z_factor_estimator = StandingKatzZFactor(CP)
+        self._molar_mass_cache: Dict[str, float] = {}
+        self._air_density_cache: Dict[Tuple[float, float], float] = {}
+        self._phase_envelope_cache: Dict[Tuple[str, Tuple[float, ...], str, str], PhaseEnvelopeData] = {}
 
-    @staticmethod
-    def _air_density(pressure_pa: float, temperature_k: float) -> float:
+    def _air_density(self, pressure_pa: float, temperature_k: float) -> float:
         """Calculate air density using CoolProp with ideal gas law fallback."""
+        key = (round(pressure_pa, 4), round(temperature_k, 4))
+        if key in self._air_density_cache:
+            return self._air_density_cache[key]
         try:
-            return CP.PropsSI('D', 'T', temperature_k, 'P', pressure_pa, 'Air')
+            val = CP.PropsSI('D', 'T', temperature_k, 'P', pressure_pa, 'Air')
+            if val is not None and val > 0:
+                self._air_density_cache[key] = val
+            return val
         except Exception:
             return pressure_pa / (287.058 * temperature_k)
+
+    def _get_molar_mass(self, component_name: str) -> float:
+        """Get component molar mass with instance-level caching."""
+        if component_name in self._molar_mass_cache:
+            return self._molar_mass_cache[component_name]
+        try:
+            m = CP.PropsSI("M", component_name)
+        except Exception:
+            state = CP.AbstractState("HEOS", component_name)
+            m = state.molar_mass()
+        if m is not None and m > 0:
+            self._molar_mass_cache[component_name] = m
+        return m
         
     def calculate_properties(
         self,
@@ -501,7 +524,8 @@ class ThermoCalculator:
 
         parallel_methods = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
         by_method: Dict[str, ZFactorComparison] = {}
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        max_workers = min(5, (os.cpu_count() or 4))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for method in parallel_methods:
                 if method in ("GERG-2008", "AGA8-Detail"):
@@ -709,7 +733,7 @@ class ThermoCalculator:
             else:
                 pe_backend = "SRK"
             state = self._create_state(mixture, temperature_k, pressure_pa, pe_backend)
-            phase_envelope = self._calculate_phase_envelope(state, pe_backend)
+            phase_envelope = self._calculate_phase_envelope(state, pe_backend, mixture=mixture)
         except Exception as e:
             self.logger.debug(f"Phase envelope skipped: {e}")
 
@@ -725,7 +749,7 @@ class ThermoCalculator:
         standard_results = self._calculate_standard_conditions(
             mixture, backend, standard_T, standard_P, standard_name
         )
-        phase_envelope = self._calculate_phase_envelope(state, backend)
+        phase_envelope = self._calculate_phase_envelope(state, backend, mixture=mixture)
         return actual_results, standard_results, phase_envelope
 
     def _compute_neqsim(
@@ -1002,11 +1026,28 @@ class ThermoCalculator:
     def _calculate_phase_envelope(
         self,
         state: 'CP.AbstractState',
-        backend: str
+        backend: str,
+        mixture: Optional[GasMixture] = None
     ) -> Optional[PhaseEnvelopeData]:
         """
         Calculate phase envelope for the gas mixture.
+        Uses cached result when the same mixture and backend was previously computed.
         """
+        cache_key = None
+        if mixture is not None:
+            try:
+                cache_key = (
+                    mixture.to_coolprop_string(),
+                    tuple(round(f, 6) for f in mixture.get_decimal_fractions()),
+                    mixture.fraction_type,
+                    backend
+                )
+                if cache_key in self._phase_envelope_cache:
+                    self.logger.debug(f"Phase envelope cache hit for {backend}")
+                    return self._phase_envelope_cache[cache_key]
+            except Exception:
+                cache_key = None
+
         try:
             self.logger.debug(f"Attempting phase envelope calculation with {backend}")
             
@@ -1051,7 +1092,7 @@ class ThermoCalculator:
             except Exception as e:
                 self.logger.debug(f"Critical point extraction failed: {e}")
 
-            return PhaseEnvelopeData(
+            envelope_result = PhaseEnvelopeData(
                 temperature_k=T_array,
                 pressure_pa=P_array,
                 cricondentherm_t=cricondentherm_t,
@@ -1060,6 +1101,13 @@ class ThermoCalculator:
                 critical_t=critical_t,
                 critical_p=critical_p,
             )
+
+            if cache_key is not None:
+                if len(self._phase_envelope_cache) >= 32:
+                    self._phase_envelope_cache.pop(next(iter(self._phase_envelope_cache)))
+                self._phase_envelope_cache[cache_key] = envelope_result
+
+            return envelope_result
         except Exception as e:
             self.logger.info(
                 f"Phase envelope unavailable with {backend}; main thermodynamic results are still valid. "
@@ -1488,12 +1536,7 @@ class ThermoCalculator:
 
         for component in mixture.components:
             component_name = GasMixture._format_gas_name_for_coolprop(component.name)
-            try:
-                molar_mass = CP.PropsSI("M", component_name)
-            except Exception:
-                state = CP.AbstractState("HEOS", component_name)
-                molar_mass = state.molar_mass()
-
+            molar_mass = self._get_molar_mass(component_name)
             weighted_mass = component.to_decimal() * molar_mass
             weighted_masses[component.name] = weighted_mass
             total += weighted_mass

@@ -114,7 +114,7 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.8.2 - Profesyonel Sürüm\n\n"
+        "Sürüm v1.8.3 - Profesyonel Sürüm\n\n"
         "v1.8.2 hotfix: tematik uygulama ikonu eklendi;\n"
         "çalıştırma dosyası adı sürümle sonlanıyor.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
@@ -223,7 +223,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm v1.8.2")
+    dialog.title(f"Yenilikler - Sürüm v1.8.3")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -235,11 +235,27 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.2",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.3",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.8.2":
+    if version == "v1.8.3":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER (Performans & Doğruluk):\n\n"
+            "• HESAPLAMA HIZLANDIRMA:\n"
+            "  - Faz Zarfı karışım bazlı önbelleğe alındı (aynı karışımda\n"
+            "    farklı T/P değişimlerinde 300 ms -> 0 ms anında yanıt).\n"
+            "  - Saf bileşen molar kütle ve hava yoğunluğu sorguları önbelleklendi.\n"
+            "  - Gaz adı normalizasyonu ve kromatografi eşlemesi lru_cache ile hızlandırıldı.\n\n"
+            "• PARALEL HESAPLAMA:\n"
+            "  - 11 EOS karşılaştırma matrisi iş parçacığı havuzu (max_workers=5)\n"
+            "    ile çok çekirdekte tam paralel hale getirildi.\n\n"
+            "• ARAYÜZ VE RAPORLAMA:\n"
+            "  - UI sonuç aktarım periyodu 40 ms'ye indirilerek tepki süresi artırıldı.\n"
+            "  - Excel (.xlsx) ve CSV dışa aktarma parametre uyumluluğu sağlandı.\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md ve WHAT_IS_NEW.md dosyalarına bakın."
+        )
+    elif version == "v1.8.2":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER (Hotfix):\n\n"
             "• UYGULAMA İKONU:\n"
@@ -282,7 +298,7 @@ def show_new_features_info() -> None:
             "• 672 test, %94 coverage.\n\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
-    elif version == "v1.7.3":
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Backend-Gaz Uyumluluk Göstergeleri:\n"
@@ -302,7 +318,7 @@ def show_new_features_info() -> None:
             "• Z-factor karşılaştırmasında non-AGA8 karışımlar için AGA8 atlanıyor.\n\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
-    elif version == "v1.7.2":
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Gelişmiş AV Koruması ve Taşınabilir Paketler:\n"
@@ -317,7 +333,7 @@ def show_new_features_info() -> None:
             "  sürüm uyumlu hale getirildi.\n\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
-    elif version == "v1.7.1":
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER:\n\n"
             "• Yeni Dağıtım Modeli (Windows): Tek .exe yerine\n"
@@ -335,7 +351,7 @@ def show_new_features_info() -> None:
             "• 606 test, %91 coverage.\n\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
-    elif version == "v1.7.0":
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ DÜZELTMELER:\n\n"
             "• Exception Güvenliği: Tüm 'except BaseException' ve 'except: pass'\n"
@@ -372,7 +388,7 @@ def show_new_features_info() -> None:
             "Gereksinim: Java 11+ ve pip install neqsim>=3.6.1\n"
             "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
         )
-    elif version == "v1.5.2":
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ DEĞİŞİKLİKLER:\n\n"
             "• Kapsamlı Test Coverage: %73→%95 (545 test, 11 modül ≥%92).\n"

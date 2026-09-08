@@ -490,7 +490,8 @@ class ReportGenerator:
         results: List[Tuple[str, str, str]],
         gas_composition: List[Tuple[str, float]],
         file_path: str,
-        comparison_results: Optional[List[List[str]]] = None
+        comparison_results: Optional[List[List[str]]] = None,
+        comparison_rows: Optional[List[List[str]]] = None,
     ) -> None:
         """
         Export results to a UTF-8 (BOM) CSV file that opens correctly in Excel.
@@ -500,8 +501,11 @@ class ReportGenerator:
             gas_composition: List of (gas_name, fraction) tuples
             file_path: Output CSV path
             comparison_results: Optional comparison matrix
+            comparison_rows: Alias for comparison_results
         """
         import csv as _csv
+
+        matrix = comparison_results if comparison_results is not None else comparison_rows
 
         with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
             writer = _csv.writer(f, delimiter=';')
@@ -512,10 +516,10 @@ class ReportGenerator:
             writer.writerow(["Özellik", "Değer", "Birim"])
             for prop, value, unit in results:
                 writer.writerow([prop, value, unit])
-            if comparison_results and len(comparison_results) > 1:
+            if matrix and len(matrix) > 1:
                 writer.writerow([])
                 writer.writerow(["MODEL KARŞILAŞTIRMA MATRİSİ"])
-                for row in comparison_results:
+                for row in matrix:
                     writer.writerow([str(c) for c in row])
 
     @staticmethod
@@ -524,7 +528,8 @@ class ReportGenerator:
         results: List[Tuple[str, str, str]],
         gas_composition: List[Tuple[str, float]],
         file_path: str,
-        comparison_results: Optional[List[List[str]]] = None
+        comparison_results: Optional[List[List[str]]] = None,
+        comparison_rows: Optional[List[List[str]]] = None,
     ) -> None:
         """
         Export results to a formatted Excel (.xlsx) workbook using openpyxl.
@@ -535,7 +540,9 @@ class ReportGenerator:
             gas_composition: List of (gas_name, fraction) tuples
             file_path: Output XLSX path
             comparison_results: Optional comparison matrix
+            comparison_rows: Alias for comparison_results
         """
+        matrix = comparison_results if comparison_results is not None else comparison_rows
         try:
             from openpyxl import Workbook
             from openpyxl.styles import Font, PatternFill, Alignment
@@ -584,9 +591,9 @@ class ReportGenerator:
             ws.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 60)
 
         # Sheet 2: Comparison matrix
-        if comparison_results and len(comparison_results) > 1:
+        if matrix and len(matrix) > 1:
             ws2 = wb.create_sheet("Karşılaştırma")
-            for row in comparison_results:
+            for row in matrix:
                 ws2.append([str(c) for c in row])
             for cell in ws2[1]:
                 cell.font = header_font_white

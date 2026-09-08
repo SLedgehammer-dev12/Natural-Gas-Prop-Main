@@ -1,10 +1,11 @@
-﻿"""
+"""
 Gas data models and mixture handling.
 
 Defines Pydantic models for gas components and mixtures with validation.
 """
 
 from typing import List, Literal, Optional
+from functools import lru_cache
 from pydantic import BaseModel, Field, field_validator, computed_field
 import re
 import difflib
@@ -286,6 +287,7 @@ class GasMixture(BaseModel):
         return '&'.join(formatted_names)
     
     @staticmethod
+    @lru_cache(maxsize=256)
     def _format_gas_name_for_coolprop(gas_name: str) -> str:
         """
         Format gas name for CoolProp compatibility.
@@ -311,6 +313,7 @@ class GasMixture(BaseModel):
         return COOLPROP_NAME_MAP.get(clean_name)
 
     @staticmethod
+    @lru_cache(maxsize=256)
     def _fuzzy_match_gas_name(clean_name: str) -> str:
         """
         Attempt fuzzy-matched gas name when exact mapping is not found.
