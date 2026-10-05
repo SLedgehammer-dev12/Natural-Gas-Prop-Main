@@ -61,7 +61,7 @@ def test_reference_heating_values_convert_molar_to_mass_weighting():
         fraction_type="molar",
     )
 
-    hhv, lhv = ThermoCalculator()._calculate_heating_values_reference(mixture)
+    hhv, lhv, _ = ThermoCalculator()._calculate_heating_values_reference(mixture)
 
     methane_molar_mass = 0.0160428
     propane_molar_mass = 0.0440956
@@ -84,7 +84,7 @@ def test_reference_heating_values_use_mass_fractions_directly():
         fraction_type="mass",
     )
 
-    hhv, lhv = ThermoCalculator()._calculate_heating_values_reference(mixture)
+    hhv, lhv, _ = ThermoCalculator()._calculate_heating_values_reference(mixture)
 
     assert hhv == pytest.approx((55.50 + 50.36) / 2)
     assert lhv == pytest.approx((50.01 + 46.37) / 2)

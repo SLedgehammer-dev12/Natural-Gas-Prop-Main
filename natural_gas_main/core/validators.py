@@ -5,6 +5,7 @@ Provides comprehensive validation for user inputs with detailed error messages.
 """
 
 from typing import Optional, List
+import math
 
 from natural_gas_main.config.settings import config
 from natural_gas_main.core.exceptions import ValidationError
@@ -53,6 +54,13 @@ def validate_numeric_input(
             field_name,
             f"Geçerli bir sayı olmalıdır. Girilen: '{value_str}'"
         )
+
+    # Reject NaN / inf — comparisons alone cannot catch them
+    if not math.isfinite(value):
+        raise ValidationError(
+            field_name,
+            f"Sonlu bir sayı olmalıdır. Girilen: '{value_str}'"
+        )
     
     # Check for zero (if not allowed)
     if not allow_zero and value == 0:
@@ -78,13 +86,18 @@ def validate_numeric_input(
 def validate_temperature(temperature_k: float) -> None:
     """
     Validate temperature value in Kelvin.
-    
+
     Args:
         temperature_k: Temperature in Kelvin
-        
+
     Raises:
         ValidationError: If temperature is out of valid range
     """
+    if not math.isfinite(temperature_k):
+        raise ValidationError(
+            "Sıcaklık",
+            "Sonlu bir sayı olmalıdır (NaN/inf kabul edilmez)."
+        )
     if temperature_k <= config.MIN_TEMPERATURE:
         raise ValidationError(
             "Sıcaklık",
@@ -101,13 +114,18 @@ def validate_temperature(temperature_k: float) -> None:
 def validate_pressure(pressure_pa: float) -> None:
     """
     Validate pressure value in Pascals.
-    
+
     Args:
         pressure_pa: Pressure in Pascals
-        
+
     Raises:
         ValidationError: If pressure is out of valid range
     """
+    if not math.isfinite(pressure_pa):
+        raise ValidationError(
+            "Basınç",
+            "Sonlu bir sayı olmalıdır (NaN/inf kabul edilmez)."
+        )
     if pressure_pa <= 0:
         raise ValidationError("Basınç", "Pozitif olmalıdır.")
     
@@ -121,13 +139,18 @@ def validate_pressure(pressure_pa: float) -> None:
 def validate_volume(volume_m3: float) -> None:
     """
     Validate volume value in cubic meters.
-    
+
     Args:
         volume_m3: Volume in m³
-        
+
     Raises:
         ValidationError: If volume is out of valid range
     """
+    if not math.isfinite(volume_m3):
+        raise ValidationError(
+            "Hacim",
+            "Sonlu bir sayı olmalıdır (NaN/inf kabul edilmez)."
+        )
     if volume_m3 <= 0:
         raise ValidationError("Hacim", "Pozitif olmalıdır.")
     

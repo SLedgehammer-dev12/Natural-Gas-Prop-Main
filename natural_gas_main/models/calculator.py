@@ -10,6 +10,7 @@ import logging
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from natural_gas_main.config.settings import config
 from natural_gas_main.core.exceptions import (
@@ -20,6 +21,11 @@ from natural_gas_main.core.exceptions import (
     ThermoCalculationError,
 )
 from natural_gas_main.models.gas_data import GasMixture
+from natural_gas_main.core.validators import (
+    validate_temperature,
+    validate_pressure,
+    validate_volume,
+)
 from natural_gas_main.models.calculation_result import (
     CalculationResult,
     ActualConditionResults,
@@ -88,23 +94,32 @@ class ThermoCalculator:
             return self._air_density_cache[key]
         try:
             val = CP.PropsSI('D', 'T', temperature_k, 'P', pressure_pa, 'Air')
-            if val is not None and val > 0:
+            if val is not None and math.isfinite(val) and val > 0:
                 self._air_density_cache[key] = val
-            return val
-        except Exception:
-            return pressure_pa / (287.058 * temperature_k)
+                return val
+            self.logger.debug(
+                f"CoolProp Air density returned invalid value ({val}); "
+                f"using ideal gas fallback."
+            )
+        except Exception as e:
+            self.logger.debug(f"CoolProp Air density failed ({e}); using ideal gas fallback.")
+        if not math.isfinite(temperature_k) or temperature_k <= 0:
+            raise ThermoCalculationError(
+                f"Hava yoğunluğu hesaplanamadı: geçersiz sıcaklık T={temperature_k}K"
+            )
+        if not math.isfinite(pressure_pa) or pressure_pa <= 0:
+            raise ThermoCalculationError(
+                f"Hava yoğunluğu hesaplanamadı: geçersiz basınç P={pressure_pa}Pa"
+            )
+        return pressure_pa / (287.058 * temperature_k)
 
     def _get_molar_mass(self, component_name: str) -> float:
         """Get component molar mass with instance-level caching."""
         if component_name in self._molar_mass_cache:
             return self._molar_mass_cache[component_name]
-        try:
-            m = CP.PropsSI("M", component_name)
-        except Exception:
-            state = CP.AbstractState("HEOS", component_name)
-            m = state.molar_mass()
-        if m is not None and m > 0:
-            self._molar_mass_cache[component_name] = m
+        # Delegate to the process-wide LRU cache (single CoolProp query per fluid).
+        m = get_cached_molar_mass(component_name)
+        self._molar_mass_cache[component_name] = m
         return m
         
     def calculate_properties(
@@ -138,9 +153,15 @@ class ThermoCalculator:
             StateUpdateError: If state update fails
             Various exceptions from validation
         """
-        # Validate mixture total
+        # Validate mixture total + physical inputs early so that
+        # NaN/inf/zero/negative T/P fail fast with a clear ValidationError
+        # instead of a cryptic CoolProp StateUpdateError or ZeroDivisionError.
         mixture.validate_total()
-        
+        validate_temperature(temperature_k)
+        validate_pressure(pressure_pa)
+        if volume_m3 is not None:
+            validate_volume(volume_m3)
+
         # Get backend to use
         backend = self._select_backend(mixture, backend)
         
@@ -192,8 +213,14 @@ class ThermoCalculator:
         Returns:
             Tuple of (result, backend_used) or (None, "")
         """
-        # Validate total fractions
+        # Validate total fractions + physical inputs once, before trying
+        # any backend. ValidationError propagates directly (it is NOT treated
+        # as a backend failure) so users get a clear message.
         mixture.validate_total()
+        validate_temperature(temperature_k)
+        validate_pressure(pressure_pa)
+        if volume_m3 is not None:
+            validate_volume(volume_m3)
         # Determine backend order
         backends = self._get_backend_order(mixture, preferred_backend)
         
@@ -226,7 +253,13 @@ class ThermoCalculator:
                 self.logger.info(f"Successfully calculated with {backend}")
                 break
                 
-            except (StateUpdateError, ThermoCalculationError, ValueError, RuntimeError) as e:
+            except Exception as e:
+                # Broad safety net: backend failures surface as many types
+                # (StateUpdateError, ValueError, but also ZeroDivisionError /
+                # TypeError / KeyError / AttributeError from poisoned
+                # intermediate values). Catching Exception (not BaseException)
+                # keeps the fallback chain alive; the error is recorded and
+                # surfaced via backend_fallback_info.
                 failures.append(f"{backend}: {e}")
                 self.logger.warning(f"Backend {backend} failed: {e}")
                 if isinstance(e, BackendNotAvailableError) and backend.startswith("neqsim-"):
@@ -525,15 +558,26 @@ class ThermoCalculator:
         parallel_methods = ["GERG-2008", "AGA8-Detail", "HEOS", "SRK", "PR"]
         by_method: Dict[str, ZFactorComparison] = {}
         max_workers = min(5, (os.cpu_count() or 4))
+        z_timeout = config.Z_COMPARISON_TIMEOUT_S
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
+            future_to_method: Dict[object, str] = {}
             for method in parallel_methods:
                 if method in ("GERG-2008", "AGA8-Detail"):
-                    futures.append(executor.submit(_build_aga8, method))
+                    future_to_method[executor.submit(_build_aga8, method)] = method
                 else:
-                    futures.append(executor.submit(_build_coolprop, method))
-            for future in futures:
-                comp = future.result()
+                    future_to_method[executor.submit(_build_coolprop, method)] = method
+            for future, method in future_to_method.items():
+                try:
+                    comp = future.result(timeout=z_timeout)
+                except FuturesTimeoutError:
+                    self.logger.warning(
+                        f"Z comparison backend '{method}' timed out "
+                        f"after {z_timeout}s; skipping."
+                    )
+                    continue
+                except Exception as e:
+                    self.logger.debug(f"Z comparison backend '{method}' failed: {e}")
+                    continue
                 if comp is not None:
                     by_method[comp.method] = comp
         for method in parallel_methods:
@@ -669,6 +713,18 @@ class ThermoCalculator:
 
     @staticmethod
     def _density_from_z(pressure_pa: float, temperature_k: float, molar_mass: float, z_factor: float) -> float:
+        if not math.isfinite(temperature_k) or temperature_k <= 0:
+            raise ThermoCalculationError(
+                f"Yoğunluk hesaplanamadı: geçersiz sıcaklık T={temperature_k}K"
+            )
+        if not math.isfinite(z_factor) or z_factor <= 0:
+            raise ThermoCalculationError(
+                f"Yoğunluk hesaplanamadı: geçersiz Z faktörü Z={z_factor}"
+            )
+        if not math.isfinite(molar_mass) or molar_mass <= 0:
+            raise ThermoCalculationError(
+                f"Yoğunluk hesaplanamadı: geçersiz molar kütle M={molar_mass}"
+            )
         return pressure_pa * molar_mass / (z_factor * 8.314462618 * temperature_k)
     
     def _calculate_with_backend(
@@ -1050,12 +1106,29 @@ class ThermoCalculator:
 
         try:
             self.logger.debug(f"Attempting phase envelope calculation with {backend}")
-            
-            # Try to build the phase envelope. Sometimes this fails for heavy mixtures.
-            state.build_phase_envelope("")
-            
+
+            # Isolate the blocking C++ call with a timeout so a hung envelope
+            # cannot freeze the whole calculation; on timeout the main
+            # thermodynamic results are still returned (envelope=None).
+            def _build_blocking():
+                # Try to build the phase envelope. Sometimes this fails for heavy mixtures.
+                state.build_phase_envelope("")
+                return state.get_phase_envelope_data()
+
+            pe_timeout = config.PHASE_ENVELOPE_TIMEOUT_S
+            with ThreadPoolExecutor(max_workers=1) as pe_executor:
+                try:
+                    pe_data = pe_executor.submit(_build_blocking).result(
+                        timeout=pe_timeout
+                    )
+                except FuturesTimeoutError:
+                    self.logger.warning(
+                        f"Phase envelope timed out after {pe_timeout}s "
+                        f"with {backend}; continuing without envelope."
+                    )
+                    return None
+
             # Extract the actual data arrays
-            pe_data = state.get_phase_envelope_data()
             T_array = list(pe_data.T)
             P_array = list(pe_data.p)
 
@@ -1319,7 +1392,7 @@ class ThermoCalculator:
         
         # Try Stage 2: Component-based CoolProp
         try:
-            hhv_mass, lhv_mass = self._calculate_heating_values_component_based(
+            hhv_mass, lhv_mass, missing = self._calculate_heating_values_component_based(
                 mixture,
                 backend,
                 T_ref,
@@ -1331,7 +1404,8 @@ class ThermoCalculator:
                     lhv_mass,
                     rho_std,
                     sg,
-                    "Bileşen bazlı (CoolProp)"
+                    "Bileşen bazlı (CoolProp)",
+                    missing=missing
                 )
         except Exception as e:
             self.logger.info(f"CoolProp component HHV/LHV unavailable: {e}")
@@ -1367,7 +1441,7 @@ class ThermoCalculator:
                      "Result may have slight deviation."
                  )
             
-            hhv_mass, lhv_mass = self._calculate_heating_values_reference(
+            hhv_mass, lhv_mass, missing = self._calculate_heating_values_reference(
                 mixture
             )
             if hhv_mass > 0 and lhv_mass > 0:
@@ -1377,7 +1451,8 @@ class ThermoCalculator:
                     lhv_mass,
                     rho_std,
                     sg,
-                    "Referans veri tabanı"
+                    "Referans veri tabanı",
+                    missing=missing
                 )
         except Exception as e:
             self.logger.warning(f"Reference database HHV/LHV failed: {e}")
@@ -1414,16 +1489,22 @@ class ThermoCalculator:
         backend: str,
         T_ref: float,
         P_ref: float
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, List[str]]:
         """Calculate heating values by summing component contributions.
 
         HHVmass()/LHVmass() returns J/kg, converted to MJ/kg.
         Weights are mass fractions; molar fractions are converted via
         _get_heating_value_mass_weights to match the mass-basis API.
+
+        Returns:
+            Tuple of (HHV, LHV) in MJ/kg plus the names of components
+            excluded for lack of data (zero-fraction and inert components
+            with legitimate zero values are NOT listed).
         """
         weights = self._get_heating_value_mass_weights(mixture)
         total_hhv = 0.0
         total_lhv = 0.0
+        missing: List[str] = []
         missing_api_logged = False
         
         for component in mixture.components:
@@ -1436,6 +1517,7 @@ class ThermoCalculator:
                     if not missing_api_logged:
                         self.logger.info("CoolProp AbstractState has no per-component HHVmass/LHVmass API")
                         missing_api_logged = True
+                    missing.append(component.name)
                     continue
                 
                 hhv = state.HHVmass() / 1e6
@@ -1457,6 +1539,7 @@ class ThermoCalculator:
                     f"Could not get heating values for {component.name}: {e}. "
                     "Using 0 contribution."
                 )
+                missing.append(component.name)
                 continue
         
         if total_hhv < 1e-6:
@@ -1464,12 +1547,12 @@ class ThermoCalculator:
                 message="No combustible components with heating value data"
             )
             
-        return total_hhv, total_lhv
+        return total_hhv, total_lhv, missing
     
     def _calculate_heating_values_reference(
         self,
         mixture: GasMixture
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, List[str]]:
         """
         Calculate heating values using reference database.
         
@@ -1477,12 +1560,14 @@ class ThermoCalculator:
             mixture: Gas mixture
             
         Returns:
-            Tuple of (HHV, LHV) in MJ/kg
+            Tuple of (HHV, LHV) in MJ/kg plus names of components absent
+            from the database (their contribution is silently zero).
         """
         weights = self._get_heating_value_mass_weights(mixture)
         total_hhv = 0.0
         total_lhv = 0.0
         components_found = 0
+        missing: List[str] = []
         
         for component in mixture.components:
             component_name = GasMixture._format_gas_name_for_coolprop(component.name)
@@ -1500,6 +1585,7 @@ class ThermoCalculator:
                     f"HHV={hhv:.2f}, LHV={lhv:.2f} MJ/kg, weight={weight:.6f}"
                 )
             else:
+                missing.append(component.name)
                 self.logger.warning(
                     f"No reference heating values for {component.name}"
                 )
@@ -1519,7 +1605,7 @@ class ThermoCalculator:
             f"LHV={total_lhv:.4f} MJ/kg ({components_found}/{len(mixture.components)} components found)"
         )
         
-        return total_hhv, total_lhv
+        return total_hhv, total_lhv, missing
 
     def _get_heating_value_mass_weights(self, mixture: GasMixture) -> dict:
         """
@@ -1536,7 +1622,12 @@ class ThermoCalculator:
 
         for component in mixture.components:
             component_name = GasMixture._format_gas_name_for_coolprop(component.name)
-            molar_mass = self._get_molar_mass(component_name)
+            try:
+                molar_mass = self._get_molar_mass(component_name)
+            except ThermoCalculationError as e:
+                raise HeatingValueError(
+                    message=f"Could not convert molar fractions to mass fractions ({e})"
+                )
             weighted_mass = component.to_decimal() * molar_mass
             weighted_masses[component.name] = weighted_mass
             total += weighted_mass
@@ -1555,7 +1646,8 @@ class ThermoCalculator:
         lhv_mass: float,
         rho_std: float,
         sg: Optional[float],
-        method: str
+        method: str,
+        missing: Optional[List[str]] = None
     ) -> HeatingValues:
         """Package heating values into result model.
 
@@ -1565,6 +1657,7 @@ class ThermoCalculator:
             rho_std: Standard density (kg/Sm³)
             sg: Specific gravity (may be None)
             method: Calculation method description
+            missing: Names of components excluded for lack of data
         """
         hhv_vol = hhv_mass * rho_std
         lhv_vol = lhv_mass * rho_std
@@ -1583,7 +1676,8 @@ class ThermoCalculator:
             lhv_volume=lhv_vol,
             wobbe_index=wobbe,
             hhv_btu_scf=hhv_btu_scf,
-            calculation_method=method
+            calculation_method=method,
+            missing_components=list(missing or [])
         )
     
     def _calculate_volume_conversion(
@@ -1709,3 +1803,49 @@ def get_unsupported_gases_for_backend(gas_names: list, backend: str) -> list:
         if not supported:
             unsupported.append(name)
     return unsupported
+
+
+@lru_cache(maxsize=256)
+def get_cached_molar_mass(cp_name: str) -> float:
+    """Return CoolProp molar mass (kg/mol) with process-wide LRU cache.
+
+    Molar masses are physical constants — caching turns the Molar% <-> Mass%
+    UI toggle from N x PropsSI calls into O(1) lookups after the first call.
+    Raises ThermoCalculationError on invalid values so callers can fall back
+    per-component instead of aborting the whole conversion.
+    """
+    logger = logging.getLogger(__name__)
+    m = None
+    try:
+        m = CP.PropsSI("M", cp_name)
+    except Exception as e:
+        logger.debug(f"PropsSI molar mass failed for {cp_name}: {e}")
+        try:
+            state = CP.AbstractState("HEOS", cp_name)
+            m = state.molar_mass()
+        except Exception as e2:
+            logger.debug(f"AbstractState molar mass failed for {cp_name}: {e2}")
+            m = None
+    if m is not None and math.isfinite(m) and m > 0:
+        return m
+    raise ThermoCalculationError(
+        f"'{cp_name}' için molar kütle hesaplanamadı (CoolProp geçersiz değer döndürdü)."
+    )
+
+
+def prewarm_molar_mass_cache(cp_names: list) -> None:
+    """Warm the molar-mass LRU cache in a daemon thread (non-blocking).
+
+    Call once at startup with the catalog gas list so the first
+    Molar% <-> Kütlesel% toggle is already instant.
+    """
+    import threading
+
+    def _warm():
+        for name in cp_names:
+            try:
+                get_cached_molar_mass(name)
+            except Exception:
+                continue
+
+    threading.Thread(target=_warm, name="molar-mass-prewarm", daemon=True).start()

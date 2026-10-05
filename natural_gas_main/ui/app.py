@@ -67,6 +67,7 @@ class ThermoApp(ctk.CTk):
         self.calculator = ThermoCalculator()
         self._calc_lock = threading.Lock()
         self._is_calculating = False
+        self._cancel_requested = False
 
         from natural_gas_main.models.neqsim_calculator import NEQSIM_AVAILABLE as _neqsim_avail
         if _neqsim_avail:
@@ -248,6 +249,18 @@ class ThermoApp(ctk.CTk):
         
         self.input_panel = InputPanel(input_frame, self.gas_list, on_change=self._on_input_changed)
         self.input_panel.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Pre-warm molar-mass cache off the UI thread so the first
+        # Molar% <-> Kütlesel% toggle is instant (constants, cached once).
+        try:
+            from natural_gas_main.models.calculator import prewarm_molar_mass_cache
+            from natural_gas_main.models.gas_data import GasMixture
+            prewarm_molar_mass_cache([
+                GasMixture._format_gas_name_for_coolprop(g)
+                for g in self.gas_list
+            ])
+        except Exception:
+            pass
         
         # Calculate button frame with progress
         calc_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
@@ -354,11 +367,18 @@ class ThermoApp(ctk.CTk):
             self.calc_button.configure(fg_color="#4CAF50", text="Hesapla")
     
     def _on_calculate(self):
-        """Handle calculate button click."""
+        """Handle calculate button click (doubles as Cancel while running)."""
         with self._calc_lock:
             if self._is_calculating:
+                # Second click while busy = cooperative cancel request.
+                # The worker thread cannot kill CoolProp mid-call, but the
+                # result is discarded on arrival and the UI frees immediately.
+                self._cancel_requested = True
+                self.status_var.set("İptal ediliyor... (mevcut adım bitince duracak)")
+                self.calc_button.configure(state="disabled", text="İptal ediliyor...")
                 return
             self._is_calculating = True
+            self._cancel_requested = False
 
         try:
             inputs = self.input_panel.get_all_inputs()
@@ -376,8 +396,8 @@ class ThermoApp(ctk.CTk):
             inputs["volume_display"] = f"{vol_str} {self.input_panel.vol_unit_var.get()}" if vol_str else None
 
             # Show progress
-            self.status_var.set("Hesaplanıyor...")
-            self.calc_button.configure(state="disabled", fg_color="#FFA500", text="Hesaplanıyor...")
+            self.status_var.set("Hesaplanıyor... (iptal için tekrar basın)")
+            self.calc_button.configure(state="normal", fg_color="#FFA500", text="İptal Et")
             self.calc_progress.pack(fill=tk.X, pady=(5, 0))
             self.calc_progress.start()
 
@@ -394,17 +414,20 @@ class ThermoApp(ctk.CTk):
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
             with self._calc_lock:
                 self._is_calculating = False
+                self._cancel_requested = False
         except ThermoCalculationError as e:
             messagebox.showerror("Giriş Hatası", str(e))
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
             with self._calc_lock:
                 self._is_calculating = False
+                self._cancel_requested = False
         except Exception as e:
             messagebox.showerror("Hata", f"Beklenmeyen hata: {e}")
             logging.error(f"Input processing failed: {e}", exc_info=True)
             self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
             with self._calc_lock:
                 self._is_calculating = False
+                self._cancel_requested = False
 
     def _check_queue(self):
         """Check queue for calculation results."""
@@ -415,6 +438,8 @@ class ThermoApp(ctk.CTk):
                     if msg_type == "success":
                         result, used_backend, inputs = data
                         self._on_calculation_success(result, used_backend, inputs)
+                    elif msg_type == "cancelled":
+                        self._on_calculation_cancelled()
                     elif msg_type == "error":
                         self._on_calculation_error(data)
                 except Exception as e:
@@ -453,61 +478,95 @@ class ThermoApp(ctk.CTk):
                 standard_name=inputs.get("standard_name")
             )
 
-            # Send success to queue
-            self.result_queue.put(("success", (result, used_backend, inputs)))
+            # Send success to queue — unless the user cancelled meanwhile,
+            # in which case discard the (possibly stale) result.
+            if self._cancel_requested:
+                self.result_queue.put(("cancelled", None))
+            else:
+                self.result_queue.put(("success", (result, used_backend, inputs)))
             
         except Exception as e:
             # Send error to queue
             self.result_queue.put(("error", e))
     
+    def _on_calculation_cancelled(self):
+        """Handle cooperative cancellation (result discarded)."""
+        self.calc_progress.stop()
+        self.calc_progress.pack_forget()
+        self.calc_button.configure(state="normal", fg_color="#4CAF50", text="Hesapla")
+        self.status_var.set("Hesaplama iptal edildi.")
+        with self._calc_lock:
+            self._is_calculating = False
+            self._cancel_requested = False
+
     def _on_calculation_success(self, result, used_backend: str, inputs: dict):
         """
         Handle successful calculation.
-        
+
         Args:
             result: Calculation result
             used_backend: Backend that was used
             inputs: Original inputs
         """
+        if self._cancel_requested:
+            self._on_calculation_cancelled()
+            return
         # Display results
         self.output_panel.display_results(result)
-        
+
         # Store for report generation
         self.last_result = result
         self.last_inputs = inputs
-        
-        # Show warnings if applicable
-        if result.heating:
-            dialogs.show_heating_value_method_warning(result.heating.calculation_method)
-        
+
+        # Non-modal notices (replaces 3 sequential popups): heating method,
+        # backend fallback, extrapolation. Errors still use modals elsewhere.
+        notices: list = []
+        if result.heating and "Bileşen bazlı" in result.heating.calculation_method:
+            notices.append(
+                "Isıl değer 'Bileşen Bazlı Toplama' ile hesaplandı "
+                "(karışım etkileşimleri ihmal edilir; mühendis onayı önerilir)."
+            )
+        if result.heating and result.heating.missing_components:
+            notices.append(
+                "Isıl değere katılmayan bileşenler (veri yok, HHV düşük "
+                f"tahmin olabilir): {', '.join(result.heating.missing_components)}."
+            )
+
         if used_backend != inputs['backend']:
-            dialogs.show_backend_used_info(inputs['backend'], used_backend)
+            notices.append(
+                f"{inputs['backend']} yerine {used_backend} kullanıldı."
+            )
+            if getattr(result, "backend_fallback_info", None):
+                notices.append(result.backend_fallback_info)
             self.status_var.set(
                 f"Hesaplama tamamlandı. "
                 f"({inputs['backend']} yerine {used_backend} kullanıldı)"
             )
         else:
             self.status_var.set("Hesaplama tamamlandı.")
-        
-        # Soft extrapolation warnings (do not block the result)
+
+        # Soft extrapolation notices (do not block the result)
         try:
-            extra_warnings = []
             if inputs['temperature_k'] > config.EXTRAPOLATION_TEMP_K:
-                extra_warnings.append(
+                notices.append(
                     f"Sıcaklık {inputs['temperature_k']:.0f} K endüstriyel doğal gaz "
                     f"aralığının üzerinde (> {config.EXTRAPOLATION_TEMP_K:.0f} K). "
                     "Sonuçlar ekstrapolasyon içerir."
                 )
             if inputs['pressure_pa'] > config.EXTRAPOLATION_PRESS_PA:
-                extra_warnings.append(
+                notices.append(
                     f"Basınç {inputs['pressure_pa'] / 1e5:.0f} bar AGA8 tanım aralığının "
                     f"üzerinde (> {config.EXTRAPOLATION_PRESS_PA / 1e5:.0f} bar). "
                     "Sonuçlar ekstrapolasyon içerir."
                 )
-            if extra_warnings:
-                dialogs.show_warning("Ekstrapolasyon Uyarısı", "\n".join(extra_warnings))
         except Exception as e:
-            self.logger.debug(f"Extrapolation warning skipped: {e}")
+            self.logger.debug(f"Extrapolation notice skipped: {e}")
+
+        self.output_panel.show_notices(notices)
+        if notices:
+            self.status_var.set(
+                self.status_var.get() + f" ({len(notices)} bilgi notu)"
+            )
         
         # Re-enable UI
         self.calc_progress.stop()
@@ -515,14 +574,18 @@ class ThermoApp(ctk.CTk):
         self.calc_button.configure(state="normal", fg_color="#4CAF50", text="Hesapla")
         with self._calc_lock:
             self._is_calculating = False
+            self._cancel_requested = False
     
     def _on_calculation_error(self, error: Exception):
         """
         Handle calculation error.
-        
+
         Args:
             error: Exception that occurred
         """
+        if self._cancel_requested:
+            self._on_calculation_cancelled()
+            return
         # Stop progress
         self.calc_progress.stop()
         self.calc_progress.pack_forget()
@@ -531,6 +594,7 @@ class ThermoApp(ctk.CTk):
         self.calc_button.configure(state="normal", fg_color="#F44336", text="Hata! Tekrar Dene")
         with self._calc_lock:
             self._is_calculating = False
+            self._cancel_requested = False
         
         # Get log lines
         log_lines = self._get_recent_log_lines(10)

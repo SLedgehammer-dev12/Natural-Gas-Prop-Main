@@ -83,9 +83,36 @@ class OutputPanel(ctk.CTkFrame):
             # Unit label var since we want to change it dynamically
             data["unit_var"] = ctk.StringVar(value=data["unit"])
             ctk.CTkLabel(card, textvariable=data["unit_var"], font=ctk.CTkFont(size=10)).pack(pady=(0, 5))
+
+        # --- NOTICE BANNER (non-modal info, replaces success-path popups) ---
+        self.notice_frame = ctk.CTkFrame(results_tab, fg_color=("gray85", "gray25"))
+        self.notice_var = ctk.StringVar(value="")
+        self._notice_visible = False
+        notice_inner = ctk.CTkFrame(self.notice_frame, fg_color="transparent")
+        notice_inner.pack(fill=tk.X, padx=5, pady=5)
+        ctk.CTkLabel(
+            notice_inner,
+            text="ⓘ Bilgi:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(side=tk.LEFT, padx=(5, 5))
+        self.notice_label = ctk.CTkLabel(
+            notice_inner,
+            textvariable=self.notice_var,
+            font=ctk.CTkFont(size=11),
+            wraplength=600,
+            justify="left",
+        )
+        self.notice_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        ctk.CTkButton(
+            notice_inner,
+            text="Kapat ✕",
+            width=70,
+            command=self.clear_notices,
+        ).pack(side=tk.RIGHT, padx=5)
         
         # --- UNIT SELECTOR & TREEVIEW ---
         unit_select_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
+        self._unit_select_frame = unit_select_frame
         unit_select_frame.pack(fill=tk.X, pady=(0, 5))
         
         ctk.CTkLabel(unit_select_frame, text="Birim Sistemi:").pack(side=tk.LEFT, padx=(0, 5))
@@ -147,10 +174,17 @@ class OutputPanel(ctk.CTkFrame):
         comp_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         comp_frame.pack(fill=tk.X, pady=(10, 0))
         ctk.CTkLabel(comp_frame, text="Yöntem Karşılaştırması (Z-Faktörü ve Temel Değerler)", font=ctk.CTkFont(weight="bold")).pack(anchor="w")
-        
+
+        # Container so the comparison matrix can scroll both vertically and
+        # horizontally (13 columns do not fit a narrow panel).
+        comp_container = ctk.CTkFrame(results_tab, fg_color="transparent")
+        comp_container.pack(fill=tk.X, pady=(5, 5))
+        comp_container.grid_rowconfigure(0, weight=1)
+        comp_container.grid_columnconfigure(0, weight=1)
+
         comp_cols = ("Özellik", "Birim", "NQ-GERG", "NQ-SRK", "NQ-PR", "NQ-CPA", "GERG", "AGA8", "HEOS", "SRK", "PR", "Katz", "DAK")
         self.comp_tree = ttk.Treeview(
-            results_tab,
+            comp_container,
             columns=comp_cols,
             show="headings",
             height=6
@@ -158,22 +192,36 @@ class OutputPanel(ctk.CTkFrame):
         
         for col in comp_cols:
             self.comp_tree.heading(col, text=col)
+            # Fixed-ish widths with stretch disabled: when the panel is narrow
+            # the columns keep a readable width and scroll horizontally instead
+            # of being squashed into unreadable slivers.
             if col == "Özellik":
-                self.comp_tree.column(col, width=130, minwidth=100)
+                self.comp_tree.column(col, width=130, minwidth=110, stretch=False)
             elif col == "Birim":
-                self.comp_tree.column(col, width=50, minwidth=40)
+                self.comp_tree.column(col, width=55, minwidth=45, stretch=False)
             else:
-                self.comp_tree.column(col, width=70, minwidth=50)
-                
-        comp_scrollbar = ttk.Scrollbar(
-            results_tab,
+                self.comp_tree.column(col, width=72, minwidth=60, stretch=False)
+
+        self.comp_tree.grid(row=0, column=0, sticky="nsew")
+
+        comp_vscroll = ttk.Scrollbar(
+            comp_container,
             orient=tk.VERTICAL,
             command=self.comp_tree.yview
         )
-        self.comp_tree.configure(yscrollcommand=comp_scrollbar.set)
-        
-        comp_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.comp_tree.pack(fill=tk.X, pady=(5, 5))
+        comp_vscroll.grid(row=0, column=1, sticky="ns")
+
+        comp_hscroll = ttk.Scrollbar(
+            comp_container,
+            orient=tk.HORIZONTAL,
+            command=self.comp_tree.xview
+        )
+        comp_hscroll.grid(row=1, column=0, sticky="ew")
+
+        self.comp_tree.configure(
+            yscrollcommand=comp_vscroll.set,
+            xscrollcommand=comp_hscroll.set
+        )
         
         # Configure tag styles
         self.results_tree.tag_configure(
@@ -391,16 +439,29 @@ class OutputPanel(ctk.CTkFrame):
     def display_results(self, result: CalculationResult) -> None:
         """
         Display calculation results in tree view.
-        
+
         Args:
             result: Calculation result object
         """
         # Clear existing results
         self.clear_results()
-        
+
         # Store result for unit switching
         self.current_result = result
-        
+
+        # Main table + KPIs depend on the unit system; comparison matrix and
+        # phase envelope do not, so they are rendered once here.
+        self._render_main_results(result)
+        self._render_comparison(result)
+        self._render_phase(result)
+
+    def _render_main_results(self, result: CalculationResult) -> None:
+        """Render the main results table + KPI cards (unit-system dependent)."""
+        # Clear only the main results tree; keep comparison/phase intact so
+        # unit switches don't rebuild the (unit-independent) comparison matrix.
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
         # Get current unit system
         unit_system = self.unit_system_var.get()
         
@@ -458,7 +519,14 @@ class OutputPanel(ctk.CTkFrame):
             else:
                 # Normal row
                 self.results_tree.insert("", tk.END, values=(prop_name, value, unit))
-                
+
+    def _render_comparison(self, result: CalculationResult) -> None:
+        """Render the Z-factor / property comparison matrix (unit-independent)."""
+        # Clear comparison tree
+        if hasattr(self, 'comp_tree'):
+            for item in self.comp_tree.get_children():
+                self.comp_tree.delete(item)
+
         # Populate Comparison Tree
         if hasattr(self, 'comp_tree') and result.z_factor_comparison:
             comp_methods = [
@@ -497,7 +565,9 @@ class OutputPanel(ctk.CTkFrame):
                 for col_name, method_name in comp_methods:
                     row_vals.append(_get_val(method_name, attr_name, decimals))
                 self.comp_tree.insert("", tk.END, values=row_vals)
-                
+
+    def _render_phase(self, result: CalculationResult) -> None:
+        """Render the phase envelope plot (unit-independent, always °C/bar)."""
         # Update Phase Envelope
         if result.phase_envelope:
             self._plot_phase_envelope(
@@ -515,11 +585,13 @@ class OutputPanel(ctk.CTkFrame):
         """
         Handle unit system change event.
         
-        Re-displays current results with new unit system.
+        Only the main results table + KPIs depend on the unit system, so
+        re-render just those. The comparison matrix (fixed SI) and the phase
+        envelope (°C/bar) are deliberately left untouched to avoid a costly
+        full rebuild and a redundant matplotlib redraw.
         """
         if self.current_result is not None:
-            # Re-display with new unit system
-            self.display_results(self.current_result)
+            self._render_main_results(self.current_result)
     
     def display_error(self, error_message: str, log_lines: List[str] = None) -> None:
         """
@@ -562,8 +634,43 @@ class OutputPanel(ctk.CTkFrame):
                     values=(line.strip(), "", "")
                 )
     
+    def show_notices(self, messages: List[str]) -> None:
+        """Show non-modal info notices (replaces success-path popups).
+
+        Args:
+            messages: List of notice strings (empty hides the banner).
+        """
+        cleaned = [m.strip() for m in (messages or []) if m and m.strip()]
+        if not cleaned:
+            self.clear_notices()
+            return
+        self.notice_var.set(" • ".join(cleaned))
+        if not self._notice_visible:
+            try:
+                unit_frame = getattr(self, "_unit_select_frame", None)
+                if unit_frame is not None:
+                    self.notice_frame.pack(
+                        fill=tk.X, pady=(0, 5), before=unit_frame
+                    )
+                else:
+                    self.notice_frame.pack(fill=tk.X, pady=(0, 5))
+            except Exception:
+                self.notice_frame.pack(fill=tk.X, pady=(0, 5))
+            self._notice_visible = True
+
+    def clear_notices(self) -> None:
+        """Hide the notice banner."""
+        self.notice_var.set("")
+        if self._notice_visible:
+            try:
+                self.notice_frame.pack_forget()
+            except Exception:
+                pass
+            self._notice_visible = False
+
     def clear_results(self) -> None:
         """Clear all results from tree view."""
+        self.clear_notices()
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         if hasattr(self, 'comp_tree'):
@@ -638,9 +745,12 @@ class OutputPanel(ctk.CTkFrame):
             avail_c = self.comp_tree.winfo_width() - 20
             if avail_c < 200:
                 return
-            self.comp_tree.column("Özellik", width=int(avail_c * 0.20))
-            self.comp_tree.column("Birim", width=int(avail_c * 0.09))
-            method_w = int(avail_c * 0.71 / 11)
+            # Keep Özellik/Birim readable and grow method columns only when
+            # there is spare room; never shrink below the readable minimum so
+            # the horizontal scrollbar (not column squash) handles narrow panels.
+            self.comp_tree.column("Özellik", width=130)
+            self.comp_tree.column("Birim", width=55)
+            method_w = max(72, int((avail_c - 130 - 55) / 11))
             for col in ("NQ-GERG", "NQ-SRK", "NQ-PR", "NQ-CPA", "GERG", "AGA8", "HEOS", "SRK", "PR", "Katz", "DAK"):
                 self.comp_tree.column(col, width=method_w)
         except tk.TclError:

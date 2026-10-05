@@ -82,7 +82,7 @@ class TestHeatingValueMassWeights:
             fraction_type="molar",
         )
         try:
-            hhv, lhv = calc._calculate_heating_values_component_based(
+            hhv, lhv, _ = calc._calculate_heating_values_component_based(
                 mixture, "HEOS", 288.15, 101325.0
             )
         except Exception:
@@ -101,7 +101,7 @@ class TestHeatingValueMassWeights:
             ],
             fraction_type="molar",
         )
-        hhv, lhv = calc._calculate_heating_values_reference(mixture)
+        hhv, lhv, _ = calc._calculate_heating_values_reference(mixture)
         assert hhv > 0
         assert lhv > 0
 
@@ -118,7 +118,7 @@ class TestHeatingValueFallbackChain:
             ],
             fraction_type="molar",
         )
-        hhv, lhv = calc._calculate_heating_values_reference(mixture)
+        hhv, lhv, _ = calc._calculate_heating_values_reference(mixture)
         assert hhv > 45
         assert lhv > 40
         assert hhv > lhv
@@ -132,7 +132,7 @@ class TestHeatingValueFallbackChain:
             ],
             fraction_type="mass",
         )
-        hhv, lhv = calc._calculate_heating_values_reference(mixture)
+        hhv, lhv, _ = calc._calculate_heating_values_reference(mixture)
         assert hhv > 40
         assert lhv > 35
 

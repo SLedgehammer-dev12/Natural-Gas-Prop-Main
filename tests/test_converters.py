@@ -138,3 +138,22 @@ class TestVolumeConversion:
 
     def test_large_volume(self):
         assert convert_volume_to_m3(1e9, "m³") == pytest.approx(1e9)
+
+
+class TestPressureRoundTrip:
+    """Gauge/absolute display round-trip must be lossless (standard-sync safety)."""
+
+    @pytest.mark.parametrize(
+        "unit",
+        ["bar(a)", "bar(g)", "kPa", "MPa", "psi(a)", "psi(g)", "atm", "Pa"],
+    )
+    @pytest.mark.parametrize("p_pa", [101325.0, 101560.0, 4.0e6, 1.0e5])
+    def test_round_trip_returns_original_pa(self, unit, p_pa):
+        display = convert_pressure_from_Pa(p_pa, unit)
+        assert convert_pressure_to_Pa(display, unit) == pytest.approx(p_pa, rel=1e-9)
+
+    def test_iso_standard_in_gauge_units_is_zero(self):
+        assert convert_pressure_from_Pa(101325.0, "bar(g)") == pytest.approx(0.0, abs=1e-9)
+        # P_ATM_PSI is a rounded constant, so a ~5e-05 psi residual is expected;
+        # the old buggy path returned ~14.696 psi (absolute) here instead.
+        assert convert_pressure_from_Pa(101325.0, "psi(g)") == pytest.approx(0.0, abs=1e-3)

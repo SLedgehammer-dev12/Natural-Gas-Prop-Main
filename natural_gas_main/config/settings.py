@@ -143,6 +143,16 @@ class AppConfig(BaseModel):
         default="neqsim-gerg2008",
         description="Default thermodynamic backend"
     )
+    Z_COMPARISON_TIMEOUT_S: float = Field(
+        default=20.0,
+        gt=0,
+        description="Per-backend timeout for the Z-factor comparison matrix (seconds)"
+    )
+    PHASE_ENVELOPE_TIMEOUT_S: float = Field(
+        default=30.0,
+        gt=0,
+        description="Timeout for phase envelope construction (seconds)"
+    )
     AVAILABLE_BACKENDS: List[str] = Field(
         default=[
             # --- NeqSim Backends (15 EOS) ---

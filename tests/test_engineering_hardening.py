@@ -24,6 +24,7 @@ from natural_gas_main.models.calculation_result import (
     ActualConditionResults,
     StandardConditionResults,
     CalculationResult,
+    HeatingValues,
     TransportProperties,
 )
 from natural_gas_main.models.calculator import ThermoCalculator, COOLPROP_AVAILABLE
@@ -498,3 +499,82 @@ def test_updater_ssl_context_fallback_without_certifi(monkeypatch):
     ctx = updater._build_ssl_context()
     assert "cafile" not in captured["kwargs"]
     assert ctx.verify_mode == ssl.CERT_REQUIRED
+
+
+# ---------------------------------------------------------------------------
+# HHV completeness transparency (missing components)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not COOLPROP_AVAILABLE, reason="CoolProp not installed")
+class TestHeatingValueMissingComponents:
+    def test_reference_lists_components_absent_from_db(self):
+        """MEG has no reference-DB entry: it must be reported, not silently zeroed."""
+        calc = ThermoCalculator()
+        mixture = GasMixture(
+            components=[
+                GasComponent(name="Methane", fraction=95.0),
+                GasComponent(name="MEG", fraction=5.0),
+            ],
+            fraction_type="mass",
+        )
+        hhv, lhv, missing = calc._calculate_heating_values_reference(mixture)
+        assert hhv > 0
+        assert missing == ["MEG"]
+
+    def test_reference_full_coverage_reports_no_missing(self):
+        calc = ThermoCalculator()
+        mixture = GasMixture(
+            components=[
+                GasComponent(name="Methane", fraction=90.0),
+                GasComponent(name="Ethane", fraction=10.0),
+            ]
+        )
+        hhv, lhv, missing = calc._calculate_heating_values_reference(mixture)
+        assert hhv > 0
+        assert missing == []
+
+    def test_display_list_shows_missing_component_warning(self):
+        actual = ActualConditionResults(
+            temperature=300.0, pressure=1e5, density=20.0, molar_mass=0.016,
+            compressibility_factor=0.95, internal_energy=-500.0, enthalpy=-480.0,
+            entropy=3.0, cp=2.2, cv=1.6,
+        )
+        standard = StandardConditionResults(
+            density_std=0.80, specific_gravity=0.62,
+            reference_temperature=288.15, reference_pressure=101325.0,
+        )
+        heating = HeatingValues(
+            hhv_mass=50.0, lhv_mass=45.0, hhv_volume=40.0, lhv_volume=36.0,
+            wobbe_index=50.0, hhv_btu_scf=1000.0,
+            calculation_method="Referans veri tabanı",
+            missing_components=["MEG"],
+        )
+        result = CalculationResult(
+            backend_used="SRK", actual=actual, standard=standard, heating=heating,
+        )
+        rows = result.to_display_list("SI")
+        text = "\n".join(str(r) for r in rows)
+        assert "Eksik Bileşen Uyarısı" in text
+        assert "MEG" in text
+
+    def test_display_list_hides_warning_when_complete(self):
+        actual = ActualConditionResults(
+            temperature=300.0, pressure=1e5, density=20.0, molar_mass=0.016,
+            compressibility_factor=0.95, internal_energy=-500.0, enthalpy=-480.0,
+            entropy=3.0, cp=2.2, cv=1.6,
+        )
+        standard = StandardConditionResults(
+            density_std=0.80, specific_gravity=0.62,
+            reference_temperature=288.15, reference_pressure=101325.0,
+        )
+        heating = HeatingValues(
+            hhv_mass=50.0, lhv_mass=45.0, hhv_volume=40.0, lhv_volume=36.0,
+            wobbe_index=50.0, hhv_btu_scf=1000.0,
+            calculation_method="Referans veri tabanı",
+        )
+        result = CalculationResult(
+            backend_used="SRK", actual=actual, standard=standard, heating=heating,
+        )
+        rows = result.to_display_list("SI")
+        text = "\n".join(str(r) for r in rows)
+        assert "Eksik Bileşen Uyarısı" not in text

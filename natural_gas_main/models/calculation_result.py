@@ -84,6 +84,10 @@ class HeatingValues(BaseModel):
     wobbe_index: float = Field(..., description="Wobbe index (MJ/Sm³)")
     hhv_btu_scf: float = Field(..., description="HHV in industrial units (Btu/SCF)")
     calculation_method: str = Field(..., description="Method used for calculation")
+    missing_components: List[str] = Field(
+        default_factory=list,
+        description="Components excluded from HHV/LHV (no data); values may be underestimated"
+    )
     
     model_config = {"frozen": False}
 
@@ -310,6 +314,15 @@ class CalculationResult(BaseModel):
             # Always show Btu/SCF for reference if not already in that unit
             if prefs['heating_value_volume'] != 'Btu/SCF':
                 results.append(("HHV (Endüstriyel)", f"{self.heating.hhv_btu_scf:.2f}", "Btu/SCF"))
+
+            # Completeness warning: excluded components make HHV/Wobbe low
+            if self.heating.missing_components:
+                results.append((
+                    "Eksik Bileşen Uyarısı",
+                    f"{', '.join(self.heating.missing_components)} için veri yok — "
+                    "HHV düşük tahmin olabilir",
+                    ""
+                ))
         else:
             results.append(("- ISIL DEĞERLER (SCM) -", "", ""))
             results.append(("Hesaplama Yöntemi (HHV/LHV)", "Veri/Yöntem Yok", ""))

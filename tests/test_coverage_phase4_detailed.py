@@ -327,7 +327,7 @@ class TestHeatingValues:
         with patch.multiple(
             calc,
             _calculate_heating_values_builtin=MagicMock(side_effect=Exception("skip")),
-            _calculate_heating_values_component_based=MagicMock(return_value=(0.0, 0.0)),
+            _calculate_heating_values_component_based=MagicMock(return_value=(0.0, 0.0, [])),
         ):
             result = calc._calculate_heating_values(simple_mixture, 0.66, 0.6, "HEOS", 288.15, 101325)
             assert result is None or isinstance(result, HeatingValues)
@@ -487,13 +487,20 @@ class TestMiscEdgeCases:
 
     def test_mass_weight_total_zero_raises(self, calc):
         """When PropsSI returns 0 molar mass, total stays 0 -> raises."""
+        from natural_gas_main.models import calculator as calc_module
         mixture = GasMixture(
             components=[GasComponent(name="Methane", fraction=100.0)],
             fraction_type="molar",
         )
-        with patch.object(FakeCoolProp, 'PropsSI', return_value=0.0):
-            with pytest.raises(HeatingValueError, match="Could not convert"):
-                calc._get_heating_value_mass_weights(mixture)
+        calc_module.get_cached_molar_mass.cache_clear()
+        calc._molar_mass_cache.clear()
+        with patch.object(calc_module.CP, 'PropsSI', return_value=0.0):
+            with patch.object(
+                calc_module.CP, 'AbstractState', side_effect=Exception("no state")
+            ):
+                with pytest.raises(HeatingValueError, match="Could not convert"):
+                    calc._get_heating_value_mass_weights(mixture)
+        calc_module.get_cached_molar_mass.cache_clear()
 
     def test_z_only_rho_air_exception(self, calc, simple_mixture):
         """_calculate_z_only_fallback handles CoolProp air density exception (line 414-415)."""

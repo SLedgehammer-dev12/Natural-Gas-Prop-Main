@@ -32,10 +32,12 @@ class TestValidateNumericInput:
         assert validate_numeric_input("1e3", "Test") == 1000.0
 
     def test_inf_nan_pass_through(self):
-        """float('inf') and float('nan') convert without ValueError."""
-        result = validate_numeric_input("inf", "Test")
+        """inf/nan must be rejected (finite-only guard against CoolProp crashes)."""
         import math
-        assert math.isinf(result)
+        with pytest.raises(ValidationError, match="Sonlu"):
+            validate_numeric_input("inf", "Test")
+        with pytest.raises(ValidationError, match="Sonlu"):
+            validate_numeric_input("nan", "Test")
 
     def test_empty_string_raises(self):
         with pytest.raises(ValidationError, match="boş"):

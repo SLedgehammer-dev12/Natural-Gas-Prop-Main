@@ -77,3 +77,28 @@ class TestGuiSmoke:
         finally:
             app.withdraw()
             app.destroy()
+
+    def test_standard_change_writes_gauge_consistent_pressure(self):
+        """Gauge birimde standart değişimi mutlak değeri yazmamalı (2x basınç bug'ı)."""
+        from natural_gas_main.ui.input_panel import InputPanel
+        import customtkinter as ctk
+
+        root = ctk.CTk()
+        try:
+            panel = InputPanel(root, gas_list=["Methane"])
+            panel.standard_var.set("ISO 13443 (15°C, 1 atm)")
+            cases = [
+                ("bar(g)", "0.00000"),
+                # psi(g): P_ATM_PSI is a rounded constant -> 5-decimal display
+                # shows the ~5e-05 psi residual; key point is no double count.
+                ("psi(g)", "0.00005"),
+                ("bar(a)", "1.01325"),
+                ("kPa", "101.32500"),
+            ]
+            for unit, expected_display in cases:
+                panel.press_unit_var.set(unit)
+                panel._on_standard_change()
+                assert panel.press_var.get() == expected_display, unit
+                assert panel.get_pressure_pa() == pytest.approx(101325.0, abs=2.0), unit
+        finally:
+            root.destroy()

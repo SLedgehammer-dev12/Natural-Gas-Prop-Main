@@ -771,6 +771,7 @@ class InputPanel(ctk.CTkFrame):
     def _on_fraction_type_change(self) -> None:
         """Convert existing fractions when switching between molar and mass basis."""
         from natural_gas_main.ui.dialogs import show_warning
+        from natural_gas_main.models.calculator import get_cached_molar_mass
 
         target = self.fraction_type_var.get()
         rows = {}
@@ -782,14 +783,19 @@ class InputPanel(ctk.CTkFrame):
         if not rows or all(v == 0 for v in rows.values()):
             return
 
-        try:
-            import CoolProp.CoolProp as CP
-            molar_masses = {}
-            for name in rows:
-                cp_name = GasMixture._format_gas_name_for_coolprop(name)
-                molar_masses[name] = CP.PropsSI("M", cp_name)
-        except Exception as e:
-            self.logger.warning(f"Fraction conversion failed: {e}")
+        # Cached per-component lookup: one CoolProp query per fluid ever,
+        # then O(1). A single bad gas no longer aborts the whole conversion.
+        molar_masses = {}
+        failed = []
+        for name in rows:
+            cp_name = GasMixture._format_gas_name_for_coolprop(name)
+            try:
+                molar_masses[name] = get_cached_molar_mass(cp_name)
+            except Exception as e:
+                failed.append(name)
+                self.logger.warning(f"Molar mass unavailable for {name}: {e}")
+
+        if not molar_masses:
             prev = "mass" if target == "molar" else "molar"
             self.fraction_type_var.set(prev)
             show_warning(
@@ -802,6 +808,8 @@ class InputPanel(ctk.CTkFrame):
         total_basis = 0.0
         converted = {}
         for name, frac in rows.items():
+            if name not in molar_masses:
+                continue  # failed gas keeps its original value
             if target == "mass":
                 # molar % -> mass %
                 converted[name] = frac * molar_masses[name]
@@ -820,6 +828,12 @@ class InputPanel(ctk.CTkFrame):
                 f"{value / total_basis * original_total:.6f}"
             )
         self._update_total_label()
+        if failed:
+            show_warning(
+                "Oran Dönüşümü",
+                f"Bazı gazlar dönüştürülemedi ({', '.join(failed)}); "
+                f"bu satırlar eski değerinde bırakıldı."
+            )
         
     def _update_total_label(self):
         """Update total composition label."""
@@ -918,17 +932,13 @@ class InputPanel(ctk.CTkFrame):
             elif temp_unit == "K":
                 self.temp_var.set(f"{t_val:.2f}")
 
+            # NOTE: must use the unit-aware inverse converter so gauge units
+            # (bar(g)/psi(g)) get the atmospheric offset subtracted. Writing
+            # the absolute standard pressure into a gauge field silently
+            # doubles the operating pressure (~202650 Pa instead of 101325 Pa).
             press_unit = self.press_unit_var.get()
-            if "bar" in press_unit:
-                self.press_var.set(f"{p_val / 1e5:.5f}")
-            elif press_unit == "kPa":
-                self.press_var.set(f"{p_val / 1000:.5f}")
-            elif press_unit == "MPa":
-                self.press_var.set(f"{p_val / 1e6:.5f}")
-            elif "psi" in press_unit:
-                self.press_var.set(f"{p_val / 6894.757:.5f}")
-            elif press_unit == "atm":
-                self.press_var.set(f"{p_val / 101325:.5f}")
+            p_display = converters.convert_pressure_from_Pa(p_val, press_unit)
+            self.press_var.set(f"{p_display:.5f}")
         else:
             self.std_info_label.configure(text="Özel tanımlı standart koşullar")
 
