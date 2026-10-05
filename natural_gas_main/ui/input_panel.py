@@ -153,8 +153,10 @@ class InputPanel(ctk.CTkFrame):
             hover_color="#263238"
         ).pack(fill=tk.X, pady=2)
         
-        # Double-click a gas name to add it
+        # Double-click a gas name to add it; Enter adds the selected gas
+        # (keyboard-only users can select with arrow keys then press Enter).
         self.gas_listbox.bind("<Double-Button-1>", lambda e: self._on_add_gas())
+        self.gas_listbox.bind("<Return>", lambda e: self._on_add_gas())
         
         # Right Panel: Selected Composition (Inline Editing)
         right_frame = ctk.CTkFrame(paned, fg_color="transparent")
@@ -847,9 +849,11 @@ class InputPanel(ctk.CTkFrame):
             
         self.total_label.configure(text=f"Toplam: {total:.4f}%")
         if abs(total - 100.0) > 0.0001:
-            self.total_label.configure(text_color="#F44336") # Red
+            # Symbol prefix keeps the state readable without relying on colour
+            # (colour-blind accessibility); red is a redundant reinforcement.
+            self.total_label.configure(text=f"⚠ Toplam: {total:.4f}%", text_color="#F44336") # Red
         else:
-            self.total_label.configure(text_color="#4CAF50") # Green
+            self.total_label.configure(text=f"✓ Toplam: {total:.4f}%", text_color="#4CAF50") # Green
             
         self._update_pie_chart()
         if self._on_change:
@@ -1005,11 +1009,15 @@ class InputPanel(ctk.CTkFrame):
         try:
             val = float(self.temp_var.get().replace(',', '.'))
             unit = self.temp_unit_var.get()
-            return converters.convert_temperature_to_K(val, unit)
+            temp_k = converters.convert_temperature_to_K(val, unit)
         except Exception as e:
             if isinstance(e, ValidationError): raise
             raise ValidationError("Sıcaklık", "Geçersiz değer")
-    
+        # Range/finite check is shared with the calculation engine so the UI
+        # rejects unphysical values before a calculation is ever started.
+        validators.validate_temperature(temp_k)
+        return temp_k
+
     def get_pressure_pa(self) -> float:
         """
         Get pressure in Pascals.
@@ -1023,11 +1031,13 @@ class InputPanel(ctk.CTkFrame):
         try:
             val = float(self.press_var.get().replace(',', '.'))
             unit = self.press_unit_var.get()
-            return converters.convert_pressure_to_Pa(val, unit)
+            press_pa = converters.convert_pressure_to_Pa(val, unit)
         except Exception as e:
             if isinstance(e, ValidationError): raise
             raise ValidationError("Basınç", "Geçersiz değer")
-    
+        validators.validate_pressure(press_pa)
+        return press_pa
+
     def get_volume_m3(self) -> Optional[float]:
         """
         Get volume in cubic meters (optional).
@@ -1050,14 +1060,12 @@ class InputPanel(ctk.CTkFrame):
             
             # Convert to m3
             val_m3 = convert_volume_to_m3(val, unit)
-            
-            # Simple validation
-            if not (1e-10 <= val_m3 <= 1e9):
-                raise ValidationError("Hacim", "Hacim 1e-10 ile 1e9 m³ arasında olmalıdır.")
-            
-            return val_m3
         except ValueError:
             raise ValidationError("Hacim", "Geçersiz sayısal değer")
+        
+        # Shared finite + range validation (config-driven bounds).
+        validators.validate_volume(val_m3)
+        return val_m3
     
     def get_backend(self) -> str:
         """

@@ -15,15 +15,15 @@ authors = [
 dependencies = [
     "CoolProp>=7.2.0,<8.0.0",
     "numpy>=1.26.0,<2.0.0",
-    "pydantic>=2.0.0",
-    "customtkinter>=5.2.2",
-    "matplotlib>=3.10.0",
-    "fpdf2>=2.8.0",
-    "pyaga8>=0.1.16",
-    "packaging>=21.0",
-    "neqsim>=3.6.1",
-    "openpyxl>=3.1.0",
-    "certifi>=2024.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "customtkinter>=5.2.2,<6.0.0",
+    "matplotlib>=3.10.0,<4.0.0",
+    "fpdf2>=2.8.0,<3.0.0",
+    "pyaga8>=0.1.16,<1.0.0",
+    "packaging>=21.0,<26.0",
+    "neqsim>=3.6.1,<4.0.0",
+    "openpyxl>=3.1.0,<4.0.0",
+    "certifi>=2024.0.0,<2027.0.0",
 ]
 
 [project.scripts]
@@ -45,7 +45,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=70 --strict-markers -ra"
+addopts = "--cov=natural_gas_main --cov-report=term --cov-fail-under=72 --strict-markers -ra"
 markers = [
     "slow: Yavaş testler (CoolProp bağımlı)",
     "integration: Entegrasyon testleri",
@@ -56,10 +56,11 @@ markers = [
 ]
 
 [tool.coverage.run]
-omit = [
-    "natural_gas_main/ui/*",
-    "natural_gas_main/main.py",
-]
+# UI and main.py are included so the coverage figure reflects the whole app.
+# GUI modules only execute under a display; in headless CI they show as 0%
+# but a coverage floor of 72% still guards the engine as a whole.
+source = ["natural_gas_main"]
+omit = []
 
 
 [tool.mypy]

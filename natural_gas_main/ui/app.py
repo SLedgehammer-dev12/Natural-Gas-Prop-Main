@@ -187,6 +187,10 @@ class ThermoApp(ctk.CTk):
         # Keyboard shortcuts
         self.bind("<Control-o>", lambda e: self._on_load_data())
         self.bind("<Control-s>", lambda e: self._on_save_data())
+        # Start / cancel calculation from the keyboard (works while focus is
+        # in any entry widget, unlike a button-only trigger).
+        self.bind("<Control-Return>", lambda e: self._on_calculate())
+        self.bind("<F5>", lambda e: self._on_calculate())
         
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)

@@ -4,6 +4,47 @@ import pytest
 from natural_gas_main.models.gas_data import GasComponent, GasMixture
 
 
+def _tk_available() -> bool:
+    """Return True if a Tk root can be created (i.e. a display is available)."""
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return True
+    except Exception:
+        return False
+
+
+TK_AVAILABLE = _tk_available()
+
+requires_tk = pytest.mark.skipif(
+    not TK_AVAILABLE,
+    reason="No display available for GUI tests",
+)
+
+
+@pytest.fixture
+def tk_root():
+    """Provide a reusable CustomTkinter root, destroyed after the test.
+
+    Skips automatically in headless environments. Using one shared fixture
+    avoids the Tk-global-state fragility of creating/destroying many roots.
+    """
+    if not TK_AVAILABLE:
+        pytest.skip("No display available for GUI tests")
+    import customtkinter as ctk
+    root = ctk.CTk()
+    root.withdraw()
+    try:
+        yield root
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 @pytest.fixture
 def simple_mixture():
     """A simple 2-component natural gas mixture (90% Methane, 10% Ethane molar)."""
