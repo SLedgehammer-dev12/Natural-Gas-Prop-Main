@@ -114,9 +114,9 @@ def show_about_dialog() -> None:
     neqsim_status = "Hazır" if NEQSIM_AVAILABLE else "Java/NeqSim gerekli"
     about_text = (
         "Termodinamik Gaz Karışımı Hesaplayıcı\n"
-        "Sürüm v1.8.3 - Profesyonel Sürüm\n\n"
-        "v1.8.2 hotfix: tematik uygulama ikonu eklendi;\n"
-        "çalıştırma dosyası adı sürümle sonlanıyor.\n\n"
+        "Sürüm v1.9.0 - Profesyonel Sürüm\n\n"
+        "v1.9.0: giriş doğrulama sertleştirmesi, iptal edilebilir hesap,\n"
+        "modal olmayan bilgi bandı, klavye kısayolları ve şeffaf kapsama.\n\n"
         f"NeqSim durumu: {neqsim_status}\n\n"
         "© 2026 Kompresör Pompa\n\n"
         "MÜHENDİSLİK SORUMLULUK REDDİ:\n"
@@ -223,7 +223,7 @@ def show_new_features_info() -> None:
     from natural_gas_main.config.settings import config
     version = config.APP_VERSION
     dialog = ctk.CTkToplevel()
-    dialog.title(f"Yenilikler - Sürüm v1.8.3")
+    dialog.title(f"Yenilikler - Sürüm v1.9.0")
     dialog.geometry("620x560")
     dialog.resizable(False, False)
     
@@ -235,11 +235,36 @@ def show_new_features_info() -> None:
     
     ctk.CTkLabel(
         frame, 
-        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.8.3",
+        text=f"🚀 DOĞAL GAZ PROP - SÜRÜM v1.9.0",
         font=ctk.CTkFont(size=15, weight="bold")
     ).pack(pady=(0, 15))
     
-    if version == "v1.8.3":
+    if version == "v1.9.0":
+        info_text = (
+            "📋 BU SÜRÜMDEKİ YENİLİKLER (Güvenilirlik & UX):\n\n"
+            "• GİRDİ GÜVENLİĞİ:\n"
+            "  - NaN/inf/0 veya negatif sıcaklık-basınç-hacim artık hesap\n"
+            "    başlamadan Türkçe hata mesajıyla reddedilir.\n"
+            "  - Hava yoğunluğu / molar kütle için bozuk CoolProp değerleri\n"
+            "    yakalanıp ideal-gaz yedeğine düşülür.\n\n"
+            "• HESAP İPTALİ VE ZAMAN AŞIMI:\n"
+            "  - Hesapla butonu çalışırken 'İptal Et' olur; sonuç atılır.\n"
+            "  - Z-karşılaştırma ve faz zarfı adımlarına zaman aşımı;\n"
+            "    takılan bir backend artık uygulamayı kilitleyemez.\n\n"
+            "• MODAL OLMAYAN BİLGİ BANDI:\n"
+            "  - Isıl değer / backend değişimi / ekstrapolasyon uyarıları\n"
+            "    artık 3 ardışık popup yerine tek satır bantta gösterilir.\n\n"
+            "• ARAYÜZ VE ERİŞİLEBİLİRLİK:\n"
+            "  - Ctrl+Enter / F5 ile hesapla; listede Enter ile gaz ekle.\n"
+            "  - Toplam yüzdesi renk körü dostu ✓/⚠ simgesiyle gösterilir.\n"
+            "  - Karşılaştırma tablosuna yatay kaydırma; sütunlar sıkışmaz.\n"
+            "  - Birim değişimi faz grafiğini yeniden çizmez (anında).\n\n"
+            "• BAĞIMLILIK & ŞEFFAFLIK:\n"
+            "  - Üst sürüm sınırları kilitlendi, eksik openpyxl eklendi.\n"
+            "  - Coverage artık UI katmanını da ölçüyor (dürüst %73).\n\n"
+            "Detaylı notlar için RELEASE_NOTES.md dosyasına bakın."
+        )
+    elif version == "v1.8.3":
         info_text = (
             "📋 BU SÜRÜMDEKİ YENİLİKLER (Performans & Doğruluk):\n\n"
             "• HESAPLAMA HIZLANDIRMA:\n"
